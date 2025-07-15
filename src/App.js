@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Sector } from 'recharts';
-import { Search, Loader, AlertCircle, TrendingUp, TrendingDown, DollarSign, Wallet, LayoutDashboard, List } from 'lucide-react';
+import { Search, Loader, AlertCircle, TrendingUp, TrendingDown, DollarSign, Wallet, LayoutDashboard, List, ChevronDown, ChevronUp } from 'lucide-react';
 
 // Cores para o gráfico e cards
 const COLORS = ['#3b82f6', '#10b981', '#f97316', '#ef4444', '#8b5cf6', '#ec4899', '#f59e0b'];
@@ -130,29 +130,45 @@ const VisaoGeralView = ({ stats }) => (
     </div>
 );
 
-const CategoriasView = ({ expensesGrouped }) => (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {Object.entries(expensesGrouped).map(([category, data], index) => {
-            const categoryTotal = data.reduce((sum, item) => sum + item.value, 0);
-            return (
-                <div key={category} className="bg-white rounded-lg shadow-md overflow-hidden flex flex-col">
-                    <div className="p-4 border-b-4" style={{ borderColor: COLORS[index % COLORS.length] }}>
-                        <h3 className="font-bold text-lg text-gray-800">{category}</h3>
-                        <p className="text-2xl font-bold text-gray-900 mt-1">R$ {categoryTotal.toFixed(2).replace('.', ',')}</p>
+const CategoriasView = ({ expensesGrouped }) => {
+    const [expandedCategory, setExpandedCategory] = useState(null);
+
+    const toggleCategory = (categoryName) => {
+        setExpandedCategory(expandedCategory === categoryName ? null : categoryName);
+    };
+
+    return (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {Object.entries(expensesGrouped).map(([category, data], index) => {
+                const categoryTotal = data.reduce((sum, item) => sum + item.value, 0);
+                const isExpanded = expandedCategory === category;
+                return (
+                    <div key={category} className="bg-white rounded-lg shadow-md overflow-hidden flex flex-col">
+                        <button onClick={() => toggleCategory(category)} className="w-full flex justify-between items-center p-4 text-left hover:bg-gray-50 border-l-4" style={{ borderColor: COLORS[index % COLORS.length] }}>
+                           <div>
+                             <h3 className="font-bold text-lg text-gray-800">{category}</h3>
+                             <p className="text-2xl font-bold text-gray-900 mt-1">R$ {categoryTotal.toFixed(2).replace('.', ',')}</p>
+                           </div>
+                           {isExpanded ? <ChevronUp size={20} className="text-gray-500"/> : <ChevronDown size={20} className="text-gray-500"/>}
+                        </button>
+                        {isExpanded && (
+                            <div className="border-t p-4">
+                                <ul className="space-y-2">
+                                    {data.map(expense => (
+                                        <li key={expense.id} className="flex justify-between text-sm text-gray-600 border-b pb-1">
+                                            <span className="truncate pr-2">{expense.description}</span>
+                                            <span className="font-medium whitespace-nowrap">R$ {expense.value.toFixed(2).replace('.', ',')}</span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                        )}
                     </div>
-                    <ul className="space-y-2 p-4 flex-grow overflow-y-auto max-h-60">
-                        {data.map(expense => (
-                            <li key={expense.id} className="flex justify-between text-sm text-gray-700 border-b pb-1">
-                                <span className="truncate pr-2">{expense.description}</span>
-                                <span className="font-medium whitespace-nowrap">R$ {expense.value.toFixed(2).replace('.', ',')}</span>
-                            </li>
-                        ))}
-                    </ul>
-                </div>
-            )
-        })}
-    </div>
-);
+                )
+            })}
+        </div>
+    );
+};
 
 
 // --- Componente Principal ---
