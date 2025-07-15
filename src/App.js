@@ -16,7 +16,7 @@ const Header = ({ onFetch, loading, phoneNumber, setPhoneNumber }) => (
           type="tel"
           value={phoneNumber}
           onChange={(e) => setPhoneNumber(e.target.value)}
-          placeholder="Seu nº de WhatsApp (5521...)"
+          placeholder="Seu nº WhatsApp (só números)"
           className="p-2 border rounded-md focus:ring-2 focus:ring-blue-500 transition w-40 sm:w-48"
           onKeyPress={(e) => e.key === 'Enter' && onFetch()}
         />
@@ -62,20 +62,12 @@ const Sidebar = ({ stats }) => (
   </aside>
 );
 
-const ActiveShapePieChart = ({ data }) => {
-  const [activeIndex, setActiveIndex] = useState(0);
-
-  const onPieEnter = (_, index) => {
-    setActiveIndex(index);
-  };
-
-  const renderActiveShape = (props) => {
-    const { cx, cy, innerRadius, outerRadius, startAngle, endAngle, fill, payload, percent, value } = props;
+const renderActiveShape = (props) => {
+    const { cx, cy, innerRadius, outerRadius, startAngle, endAngle, fill, payload, percent } = props;
     return (
       <g>
         <text x={cx} y={cy - 10} dy={8} textAnchor="middle" fill={fill} className="font-bold text-lg">{payload.name}</text>
-        <text x={cx} y={cy + 10} dy={8} textAnchor="middle" fill="#333">{`R$ ${value.toFixed(2).replace('.', ',')}`}</text>
-        <text x={cx} y={cy + 30} dy={8} textAnchor="middle" fill="#999">{`( ${(percent * 100).toFixed(2)}% )`}</text>
+        <text x={cx} y={cy + 15} dy={8} textAnchor="middle" fill="#999">{`( ${(percent * 100).toFixed(2)}% )`}</text>
         <Sector
           cx={cx}
           cy={cy}
@@ -86,42 +78,29 @@ const ActiveShapePieChart = ({ data }) => {
           fill={fill}
           stroke="#fff"
         />
-        <Sector
-          cx={cx}
-          cy={cy}
-          startAngle={startAngle}
-          endAngle={endAngle}
-          innerRadius={outerRadius + 6}
-          outerRadius={outerRadius + 10}
-          fill={fill}
-        />
       </g>
     );
-  };
-
-  return (
-    <ResponsiveContainer width="100%" height={300}>
-      <PieChart>
-        <Pie
-          activeIndex={activeIndex}
-          activeShape={renderActiveShape}
-          data={data}
-          cx="50%"
-          cy="50%"
-          innerRadius={80}
-          outerRadius={110}
-          fill="#8884d8"
-          dataKey="value"
-          onMouseEnter={onPieEnter}
-        >
-          {data.map((entry, index) => (
-            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-          ))}
-        </Pie>
-      </PieChart>
-    </ResponsiveContainer>
-  );
 };
+
+const CategoryDetails = ({ data, total }) => (
+    <div className="space-y-3">
+        {data.map((entry, index) => {
+            const percentage = total > 0 ? (entry.value / total * 100).toFixed(1) : 0;
+            return (
+                <div key={`item-${index}`} className="flex items-center justify-between text-sm">
+                    <div className="flex items-center">
+                        <div className="w-3 h-3 rounded-full mr-3" style={{ backgroundColor: COLORS[index % COLORS.length] }}></div>
+                        <span className="text-gray-700">{entry.name}</span>
+                    </div>
+                    <div className="flex items-center">
+                        <span className="font-bold text-gray-800 mr-2">R$ {entry.value.toFixed(2).replace('.', ',')}</span>
+                        <span className="text-gray-500 text-xs w-12 text-right">{percentage}%</span>
+                    </div>
+                </div>
+            )
+        })}
+    </div>
+);
 
 
 const MainContent = ({ stats, balanceOverTime, expenseByCategory }) => (
@@ -129,7 +108,7 @@ const MainContent = ({ stats, balanceOverTime, expenseByCategory }) => (
     <div className="bg-white p-6 rounded-lg shadow">
       <h3 className="text-lg font-semibold text-gray-800 mb-4">Evolução do Saldo no Período</h3>
       <ResponsiveContainer width="100%" height={300}>
-        <AreaChart data={balanceOverTime}>
+        <AreaChart data={balanceOverTime} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
           <CartesianGrid strokeDasharray="3 3" />
           <XAxis dataKey="date" />
           <YAxis tickFormatter={(value) => `R$${value/1000}k`} />
@@ -141,7 +120,29 @@ const MainContent = ({ stats, balanceOverTime, expenseByCategory }) => (
     </div>
     <div className="bg-white p-6 rounded-lg shadow">
       <h3 className="text-lg font-semibold text-gray-800 mb-4">Despesas por Categoria</h3>
-      <ActiveShapePieChart data={expenseByCategory} />
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
+        <ResponsiveContainer width="100%" height={250}>
+            <PieChart>
+                <Pie
+                    data={expenseByCategory}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    outerRadius={100}
+                    fill="#8884d8"
+                    dataKey="value"
+                    activeShape={renderActiveShape}
+                    activeIndex={0} // Pode ser dinâmico com onMouseEnter
+                >
+                    {expenseByCategory.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                </Pie>
+                <Tooltip formatter={(value) => `R$ ${value.toFixed(2).replace('.', ',')}`}/>
+            </PieChart>
+        </ResponsiveContainer>
+        <CategoryDetails data={expenseByCategory} total={stats.totalExpense} />
+      </div>
     </div>
   </main>
 );
@@ -208,7 +209,7 @@ const App = () => {
       if (existing) existing.value += expense.value;
       else acc.push({ name: category, value: expense.value });
       return acc;
-    }, []);
+    }, []).sort((a, b) => b.value - a.value);
 
     return { totalIncome, totalExpense, balance, expenseByCategory, balanceOverTime };
   }, [apiData]);
