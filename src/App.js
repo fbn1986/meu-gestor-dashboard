@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, Sector } from 'recharts';
-import { Search, Loader, AlertCircle, ChevronLeft, ChevronRight, Calendar, TrendingUp, TrendingDown, DollarSign } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { PieChart, Pie, Cell, ResponsiveContainer, Sector } from 'recharts';
+import { Search, Loader, AlertCircle, TrendingUp, TrendingDown, DollarSign, Wallet } from 'lucide-react';
 
 // Cores para o gráfico de pizza
 const COLORS = ['#3b82f6', '#10b981', '#f97316', '#ef4444', '#8b5cf6', '#ec4899', '#f59e0b'];
@@ -10,7 +10,10 @@ const COLORS = ['#3b82f6', '#10b981', '#f97316', '#ef4444', '#8b5cf6', '#ec4899'
 const Header = ({ onFetch, loading, phoneNumber, setPhoneNumber }) => (
   <header className="bg-white shadow-sm sticky top-0 z-20">
     <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-wrap justify-between items-center gap-4">
-      <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Meu Gestor</h1>
+      <div className="flex items-center gap-3">
+        <Wallet className="text-blue-600" size={28} />
+        <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Meu Gestor</h1>
+      </div>
       <div className="flex items-center space-x-2">
         <input
           type="tel"
@@ -33,41 +36,30 @@ const Header = ({ onFetch, loading, phoneNumber, setPhoneNumber }) => (
   </header>
 );
 
-const Sidebar = ({ stats }) => (
-  <aside className="w-full lg:w-1/4 space-y-6">
-    <div className="bg-white p-6 rounded-lg shadow">
-      <h3 className="text-md font-semibold text-gray-500 mb-1">Resultado do Período</h3>
-      <p className={`text-3xl font-bold ${stats.balance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-        R$ {stats.balance.toFixed(2).replace('.', ',')}
-      </p>
-    </div>
-    <div className="bg-white p-6 rounded-lg shadow">
-      <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center"><TrendingUp className="text-green-500 mr-2" /> Entradas</h3>
-      <div className="space-y-2">
-        <div className="flex justify-between">
-          <span className="text-gray-600">Realizado</span>
-          <span className="font-bold text-green-600">R$ {stats.totalIncome.toFixed(2).replace('.', ',')}</span>
+const StatCard = ({ title, value, icon, colorClass }) => (
+    <div className="bg-white p-4 rounded-lg shadow flex-1">
+      <div className="flex items-center">
+        <div className={`p-2 rounded-lg mr-4 ${colorClass}`}>
+          {icon}
+        </div>
+        <div>
+          <p className="text-sm text-gray-500">{title}</p>
+          <p className="text-xl font-bold text-gray-800">R$ {value.toFixed(2).replace('.', ',')}</p>
         </div>
       </div>
     </div>
-    <div className="bg-white p-6 rounded-lg shadow">
-      <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center"><TrendingDown className="text-red-500 mr-2" /> Saídas</h3>
-       <div className="space-y-2">
-        <div className="flex justify-between">
-          <span className="text-gray-600">Realizado</span>
-          <span className="font-bold text-red-600">R$ {stats.totalExpense.toFixed(2).replace('.', ',')}</span>
-        </div>
-      </div>
-    </div>
-  </aside>
 );
 
 const renderActiveShape = (props) => {
-    const { cx, cy, innerRadius, outerRadius, startAngle, endAngle, fill, payload, percent } = props;
+    const { cx, cy, innerRadius, outerRadius, startAngle, endAngle, fill, payload } = props;
     return (
       <g>
-        <text x={cx} y={cy - 10} dy={8} textAnchor="middle" fill={fill} className="font-bold text-lg">{payload.name}</text>
-        <text x={cx} y={cy + 15} dy={8} textAnchor="middle" fill="#999">{`( ${(percent * 100).toFixed(2)}% )`}</text>
+        <text x={cx} y={cy - 5} dy={8} textAnchor="middle" fill="#333" className="font-bold text-2xl">
+            R$ {payload.value.toFixed(2).replace('.', ',')}
+        </text>
+        <text x={cx} y={cy + 20} dy={8} textAnchor="middle" fill="#999" className="text-sm">
+            Total Pago
+        </text>
         <Sector
           cx={cx}
           cy={cy}
@@ -83,11 +75,11 @@ const renderActiveShape = (props) => {
 };
 
 const CategoryDetails = ({ data, total }) => (
-    <div className="space-y-3">
+    <div className="w-full space-y-3">
         {data.map((entry, index) => {
             const percentage = total > 0 ? (entry.value / total * 100).toFixed(1) : 0;
             return (
-                <div key={`item-${index}`} className="flex items-center justify-between text-sm">
+                <div key={`item-${index}`} className="flex items-center justify-between text-sm hover:bg-gray-50 p-1 rounded">
                     <div className="flex items-center">
                         <div className="w-3 h-3 rounded-full mr-3" style={{ backgroundColor: COLORS[index % COLORS.length] }}></div>
                         <span className="text-gray-700">{entry.name}</span>
@@ -102,52 +94,6 @@ const CategoryDetails = ({ data, total }) => (
     </div>
 );
 
-
-const MainContent = ({ stats, balanceOverTime, expenseByCategory }) => (
-  <main className="w-full lg:w-3/4 space-y-8">
-    <div className="bg-white p-6 rounded-lg shadow">
-      <h3 className="text-lg font-semibold text-gray-800 mb-4">Evolução do Saldo no Período</h3>
-      <ResponsiveContainer width="100%" height={300}>
-        <AreaChart data={balanceOverTime} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
-          <CartesianGrid strokeDasharray="3 3" />
-          <XAxis dataKey="date" />
-          <YAxis tickFormatter={(value) => `R$${value/1000}k`} />
-          <Tooltip formatter={(value) => `R$ ${value.toFixed(2).replace('.', ',')}`}/>
-          <Legend />
-          <Area type="monotone" dataKey="saldo" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.2} name="Saldo Acumulado" />
-        </AreaChart>
-      </ResponsiveContainer>
-    </div>
-    <div className="bg-white p-6 rounded-lg shadow">
-      <h3 className="text-lg font-semibold text-gray-800 mb-4">Despesas por Categoria</h3>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
-        <ResponsiveContainer width="100%" height={250}>
-            <PieChart>
-                <Pie
-                    data={expenseByCategory}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    outerRadius={100}
-                    fill="#8884d8"
-                    dataKey="value"
-                    activeShape={renderActiveShape}
-                    activeIndex={0} // Pode ser dinâmico com onMouseEnter
-                >
-                    {expenseByCategory.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                </Pie>
-                <Tooltip formatter={(value) => `R$ ${value.toFixed(2).replace('.', ',')}`}/>
-            </PieChart>
-        </ResponsiveContainer>
-        <CategoryDetails data={expenseByCategory} total={stats.totalExpense} />
-      </div>
-    </div>
-  </main>
-);
-
-// --- Componente Principal ---
 const App = () => {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [apiData, setApiData] = useState(null);
@@ -163,7 +109,6 @@ const App = () => {
     setError(null);
     setApiData(null);
     try {
-      // IMPORTANTE: Use a URL do seu backend na Render
       const API_URL = `https://meu-gestor-fernando.onrender.com/api/data/${phoneNumber}`;
       const response = await fetch(API_URL);
       if (!response.ok) throw new Error('Falha ao buscar dados. Verifique o número.');
@@ -180,25 +125,6 @@ const App = () => {
   const processedData = useMemo(() => {
     if (!apiData) return null;
 
-    const allTransactions = [
-      ...apiData.incomes.map(t => ({ ...t, type: 'income' })),
-      ...apiData.expenses.map(t => ({ ...t, type: 'expense' }))
-    ].sort((a, b) => new Date(a.date) - new Date(b.date));
-
-    let cumulativeBalance = 0;
-    const balanceOverTime = allTransactions.reduce((acc, transaction) => {
-      const date = new Date(transaction.date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
-      cumulativeBalance += transaction.type === 'income' ? transaction.value : -transaction.value;
-      
-      const existingEntry = acc.find(e => e.date === date);
-      if (existingEntry) {
-        existingEntry.saldo = cumulativeBalance;
-      } else {
-        acc.push({ date, saldo: cumulativeBalance });
-      }
-      return acc;
-    }, []);
-
     const totalIncome = apiData.incomes.reduce((sum, item) => sum + item.value, 0);
     const totalExpense = apiData.expenses.reduce((sum, item) => sum + item.value, 0);
     const balance = totalIncome - totalExpense;
@@ -211,7 +137,7 @@ const App = () => {
       return acc;
     }, []).sort((a, b) => b.value - a.value);
 
-    return { totalIncome, totalExpense, balance, expenseByCategory, balanceOverTime };
+    return { totalIncome, totalExpense, balance, expenseByCategory };
   }, [apiData]);
 
   return (
@@ -241,9 +167,46 @@ const App = () => {
         )}
 
         {processedData && (
-          <div className="flex flex-col lg:flex-row gap-8">
-            <Sidebar stats={processedData} />
-            <MainContent stats={processedData} balanceOverTime={processedData.balanceOverTime} expenseByCategory={processedData.expenseByCategory} />
+          <div className="space-y-8">
+            {/* Cards de Estatísticas */}
+            <div className="flex flex-col sm:flex-row gap-4 sm:gap-6">
+              <StatCard title="Receitas" value={processedData.totalIncome} icon={<TrendingUp size={24} className="text-green-600"/>} colorClass="bg-green-100"/>
+              <StatCard title="Despesas" value={processedData.totalExpense} icon={<TrendingDown size={24} className="text-red-600"/>} colorClass="bg-red-100"/>
+              <StatCard title="Balanço" value={processedData.balance} icon={<DollarSign size={24} className="text-blue-600"/>} colorClass="bg-blue-100"/>
+            </div>
+
+            {/* Gráfico de Despesas */}
+            <div className="bg-white p-6 rounded-lg shadow">
+              <h3 className="text-lg font-semibold text-gray-800 mb-4">Despesas</h3>
+              <div className="flex flex-col md:flex-row gap-8 items-center">
+                <div className="w-full md:w-1/2 lg:w-2/5">
+                    <ResponsiveContainer width="100%" height={250}>
+                        <PieChart>
+                            <Pie
+                                data={processedData.expenseByCategory}
+                                cx="50%"
+                                cy="50%"
+                                innerRadius={70}
+                                outerRadius={100}
+                                fill="#8884d8"
+                                paddingAngle={2}
+                                dataKey="value"
+                                activeShape={renderActiveShape}
+                                activeIndex={0}
+                            >
+                                {processedData.expenseByCategory.map((entry, index) => (
+                                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                ))}
+                            </Pie>
+                        </PieChart>
+                    </ResponsiveContainer>
+                </div>
+                <div className="w-full md:w-1/2 lg:w-3/5">
+                    <h4 className="font-semibold mb-3 text-gray-600">Detalhes por Categoria</h4>
+                    <CategoryDetails data={processedData.expenseByCategory} total={processedData.totalExpense} />
+                </div>
+              </div>
+            </div>
           </div>
         )}
       </div>
