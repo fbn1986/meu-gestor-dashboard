@@ -1,11 +1,11 @@
 import React, { useState, useMemo } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Sector } from 'recharts';
-import { Search, Loader, AlertCircle, TrendingUp, TrendingDown, DollarSign, Wallet, LayoutDashboard, List, ChevronDown, ChevronUp } from 'lucide-react';
+import { Search, Loader, AlertCircle, TrendingUp, TrendingDown, DollarSign, Wallet, LayoutDashboard, List } from 'lucide-react';
 
-// Cores para o gráfico de pizza
+// Cores para o gráfico e cards
 const COLORS = ['#3b82f6', '#10b981', '#f97316', '#ef4444', '#8b5cf6', '#ec4899', '#f59e0b'];
 
-// --- Componentes de UI ---
+// --- Componentes da UI ---
 
 const Header = ({ onFetch, loading, phoneNumber, setPhoneNumber, activeView, setActiveView }) => (
   <header className="bg-white shadow-sm sticky top-0 z-20">
@@ -37,15 +37,15 @@ const Header = ({ onFetch, loading, phoneNumber, setPhoneNumber, activeView, set
       <nav className="flex space-x-4 sm:space-x-8 -mb-px">
         <button 
           onClick={() => setActiveView('visaoGeral')}
-          className={`py-3 px-1 text-sm font-medium border-b-2 ${activeView === 'visaoGeral' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
+          className={`py-3 px-1 text-sm font-medium border-b-2 flex items-center gap-2 ${activeView === 'visaoGeral' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
         >
-          Visão Geral
+          <LayoutDashboard size={16} /> Visão Geral
         </button>
         <button 
           onClick={() => setActiveView('categorias')}
-          className={`py-3 px-1 text-sm font-medium border-b-2 ${activeView === 'categorias' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
+          className={`py-3 px-1 text-sm font-medium border-b-2 flex items-center gap-2 ${activeView === 'categorias' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
         >
-          Categorias
+          <List size={16} /> Categorias
         </button>
       </nav>
     </div>
@@ -130,51 +130,29 @@ const VisaoGeralView = ({ stats }) => (
     </div>
 );
 
-const CategoriasView = ({ expensesGrouped, totalExpense }) => {
-    const [expandedCategory, setExpandedCategory] = useState(null);
-
-    const toggleCategory = (categoryName) => {
-        setExpandedCategory(expandedCategory === categoryName ? null : categoryName);
-    };
-
-    return (
-        <div className="bg-white p-6 rounded-lg shadow">
-            <h3 className="text-lg font-semibold text-gray-800 mb-4">Detalhes por Categoria</h3>
-            <div className="space-y-4">
-                {Object.entries(expensesGrouped).map(([category, data], index) => {
-                    const categoryTotal = data.reduce((sum, item) => sum + item.value, 0);
-                    const isExpanded = expandedCategory === category;
-                    return (
-                        <div key={category} className="border rounded-md">
-                            <button onClick={() => toggleCategory(category)} className="w-full flex justify-between items-center p-4 text-left hover:bg-gray-50">
-                                <div className="flex items-center">
-                                    <div className="w-4 h-4 rounded-full mr-4" style={{backgroundColor: COLORS[index % COLORS.length]}}></div>
-                                    <span className="font-semibold text-gray-800">{category}</span>
-                                </div>
-                                <div className="flex items-center">
-                                    <span className="font-bold mr-4">R$ {categoryTotal.toFixed(2).replace('.', ',')}</span>
-                                    {isExpanded ? <ChevronUp size={20} className="text-gray-500"/> : <ChevronDown size={20} className="text-gray-500"/>}
-                                </div>
-                            </button>
-                            {isExpanded && (
-                                <div className="border-t p-4">
-                                    <ul className="space-y-2">
-                                        {data.map(expense => (
-                                            <li key={expense.id} className="flex justify-between text-sm text-gray-600">
-                                                <span>{expense.description}</span>
-                                                <span>R$ {expense.value.toFixed(2).replace('.', ',')}</span>
-                                            </li>
-                                        ))}
-                                    </ul>
-                                </div>
-                            )}
-                        </div>
-                    )
-                })}
-            </div>
-        </div>
-    );
-};
+const CategoriasView = ({ expensesGrouped }) => (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {Object.entries(expensesGrouped).map(([category, data], index) => {
+            const categoryTotal = data.reduce((sum, item) => sum + item.value, 0);
+            return (
+                <div key={category} className="bg-white rounded-lg shadow-md overflow-hidden flex flex-col">
+                    <div className="p-4 border-b-4" style={{ borderColor: COLORS[index % COLORS.length] }}>
+                        <h3 className="font-bold text-lg text-gray-800">{category}</h3>
+                        <p className="text-2xl font-bold text-gray-900 mt-1">R$ {categoryTotal.toFixed(2).replace('.', ',')}</p>
+                    </div>
+                    <ul className="space-y-2 p-4 flex-grow overflow-y-auto max-h-60">
+                        {data.map(expense => (
+                            <li key={expense.id} className="flex justify-between text-sm text-gray-700 border-b pb-1">
+                                <span className="truncate pr-2">{expense.description}</span>
+                                <span className="font-medium whitespace-nowrap">R$ {expense.value.toFixed(2).replace('.', ',')}</span>
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            )
+        })}
+    </div>
+);
 
 
 // --- Componente Principal ---
@@ -225,8 +203,17 @@ const App = () => {
         acc[category].push(expense);
         return acc;
     }, {});
+    
+    // Ordena o objeto de categorias pelo total gasto em cada uma
+    const sortedExpensesGrouped = Object.entries(expensesGrouped)
+      .sort(([, aData], [, bData]) => {
+        const aTotal = aData.reduce((sum, item) => sum + item.value, 0);
+        const bTotal = bData.reduce((sum, item) => sum + item.value, 0);
+        return bTotal - aTotal;
+      })
+      .reduce((acc, [key, value]) => ({ ...acc, [key]: value }), {});
 
-    return { totalIncome, totalExpense, balance, expenseByCategory, expensesGrouped };
+    return { totalIncome, totalExpense, balance, expenseByCategory, expensesGrouped: sortedExpensesGrouped };
   }, [apiData]);
 
   return (
@@ -258,7 +245,7 @@ const App = () => {
         {processedData && (
           <>
             {activeView === 'visaoGeral' && <VisaoGeralView stats={processedData} />}
-            {activeView === 'categorias' && <CategoriasView expensesGrouped={processedData.expensesGrouped} totalExpense={processedData.totalExpense} />}
+            {activeView === 'categorias' && <CategoriasView expensesGrouped={processedData.expensesGrouped} />}
           </>
         )}
       </div>
