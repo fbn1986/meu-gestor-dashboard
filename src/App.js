@@ -37,61 +37,61 @@ const Header = ({ onFetch, loading, phoneNumber, setPhoneNumber }) => (
 );
 
 const StatCard = ({ title, value, icon, colorClass }) => (
-    <div className="bg-white p-4 rounded-lg shadow flex-1">
-      <div className="flex items-center">
-        <div className={`p-2 rounded-lg mr-4 ${colorClass}`}>
-          {icon}
-        </div>
-        <div>
-          <p className="text-sm text-gray-500">{title}</p>
-          <p className="text-xl font-bold text-gray-800">R$ {value.toFixed(2).replace('.', ',')}</p>
-        </div>
+  <div className="bg-white p-4 rounded-lg shadow flex-1">
+    <div className="flex items-center">
+      <div className={`p-2 rounded-lg mr-4 ${colorClass}`}>
+        {icon}
+      </div>
+      <div>
+        <p className="text-sm text-gray-500">{title}</p>
+        <p className="text-xl font-bold text-gray-800">R$ {value.toFixed(2).replace('.', ',')}</p>
       </div>
     </div>
+  </div>
 );
 
 const renderActiveShape = (props) => {
-    const { cx, cy, innerRadius, outerRadius, startAngle, endAngle, fill, payload } = props;
-    return (
-      <g>
-        <text x={cx} y={cy - 5} dy={8} textAnchor="middle" fill="#333" className="font-bold text-2xl">
-            R$ {payload.value.toFixed(2).replace('.', ',')}
-        </text>
-        <text x={cx} y={cy + 20} dy={8} textAnchor="middle" fill="#999" className="text-sm">
-            Total Pago
-        </text>
-        <Sector
-          cx={cx}
-          cy={cy}
-          innerRadius={innerRadius}
-          outerRadius={outerRadius}
-          startAngle={startAngle}
-          endAngle={endAngle}
-          fill={fill}
-          stroke="#fff"
-        />
-      </g>
-    );
+  const { cx, cy, innerRadius, outerRadius, startAngle, endAngle, fill, payload } = props;
+  return (
+    <g>
+      <text x={cx} y={cy - 5} dy={8} textAnchor="middle" fill="#333" className="font-bold text-2xl">
+        R$ {payload.value.toFixed(2).replace('.', ',')}
+      </text>
+      <text x={cx} y={cy + 20} dy={8} textAnchor="middle" fill="#999" className="text-sm">
+        Total Pago
+      </text>
+      <Sector
+        cx={cx}
+        cy={cy}
+        innerRadius={innerRadius}
+        outerRadius={outerRadius}
+        startAngle={startAngle}
+        endAngle={endAngle}
+        fill={fill}
+        stroke="#fff"
+      />
+    </g>
+  );
 };
 
 const CategoryDetails = ({ data, total }) => (
-    <div className="w-full space-y-3">
-        {data.map((entry, index) => {
-            const percentage = total > 0 ? (entry.value / total * 100).toFixed(1) : 0;
-            return (
-                <div key={`item-${index}`} className="flex items-center justify-between text-sm hover:bg-gray-50 p-1 rounded">
-                    <div className="flex items-center">
-                        <div className="w-3 h-3 rounded-full mr-3" style={{ backgroundColor: COLORS[index % COLORS.length] }}></div>
-                        <span className="text-gray-700">{entry.name}</span>
-                    </div>
-                    <div className="flex items-center">
-                        <span className="font-bold text-gray-800 mr-2">R$ {entry.value.toFixed(2).replace('.', ',')}</span>
-                        <span className="text-gray-500 text-xs w-12 text-right">{percentage}%</span>
-                    </div>
-                </div>
-            )
-        })}
-    </div>
+  <div className="w-full space-y-3">
+    {data.map((entry, index) => {
+      const percentage = total > 0 ? (entry.value / total * 100).toFixed(1) : 0;
+      return (
+        <div key={`item-${index}`} className="flex items-center justify-between text-sm hover:bg-gray-50 p-1 rounded">
+          <div className="flex items-center">
+            <div className="w-3 h-3 rounded-full mr-3" style={{ backgroundColor: COLORS[index % COLORS.length] }}></div>
+            <span className="text-gray-700">{entry.name}</span>
+          </div>
+          <div className="flex items-center">
+            <span className="font-bold text-gray-800 mr-2">R$ {entry.value.toFixed(2).replace('.', ',')}</span>
+            <span className="text-gray-500 text-xs w-12 text-right">{percentage}%</span>
+          </div>
+        </div>
+      )
+    })}
+  </div>
 );
 
 const App = () => {
@@ -169,10 +169,10 @@ const App = () => {
         {processedData && (
           <div className="space-y-8">
             {/* Cards de Estatísticas */}
-            <div className="flex flex-col sm:flex-row gap-4 sm:gap-6">
-              <StatCard title="Receitas" value={processedData.totalIncome} icon={<TrendingUp size={24} className="text-green-600"/>} colorClass="bg-green-100"/>
-              <StatCard title="Despesas" value={processedData.totalExpense} icon={<TrendingDown size={24} className="text-red-600"/>} colorClass="bg-red-100"/>
-              <StatCard title="Balanço" value={processedData.balance} icon={<DollarSign size={24} className="text-blue-600"/>} colorClass="bg-blue-100"/>
+            <div className="flex flex-col sm:flex-row gap-6">
+              <StatCard title="Receitas" value={processedData.totalIncome} icon={<TrendingUp size={24} />} colorClass="bg-green-100" />
+              <StatCard title="Despesas" value={processedData.totalExpense} icon={<TrendingDown size={24} />} colorClass="bg-red-100" />
+              <StatCard title="Balanço" value={processedData.balance} icon={<DollarSign size={24} />} colorClass="bg-blue-100" />
             </div>
 
             {/* Gráfico de Despesas */}
@@ -181,29 +181,29 @@ const App = () => {
               <div className="flex flex-col md:flex-row gap-8 items-center">
                 <div className="w-full md:w-1/2 lg:w-2/5">
                     <ResponsiveContainer width="100%" height={250}>
-                        <PieChart>
-                            <Pie
-                                data={processedData.expenseByCategory}
-                                cx="50%"
-                                cy="50%"
-                                innerRadius={70}
-                                outerRadius={100}
-                                fill="#8884d8"
-                                paddingAngle={2}
-                                dataKey="value"
-                                activeShape={renderActiveShape}
-                                activeIndex={0}
-                            >
-                                {processedData.expenseByCategory.map((entry, index) => (
-                                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                                ))}
-                            </Pie>
-                        </PieChart>
+                      <PieChart>
+                        <Pie
+                          data={processedData.expenseByCategory}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={70}
+                          outerRadius={100}
+                          fill="#8884d8"
+                          paddingAngle={2}
+                          dataKey="value"
+                          activeShape={renderActiveShape}
+                          activeIndex={0}
+                        >
+                          {processedData.expenseByCategory.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                          ))}
+                        </Pie>
+                      </PieChart>
                     </ResponsiveContainer>
                 </div>
                 <div className="w-full md:w-1/2 lg:w-3/5">
-                    <h4 className="font-semibold mb-3 text-gray-600">Detalhes por Categoria</h4>
-                    <CategoryDetails data={processedData.expenseByCategory} total={processedData.totalExpense} />
+                  <h4 className="font-semibold mb-3 text-gray-600">Detalhes por Categoria</h4>
+                  <CategoryDetails data={processedData.expenseByCategory} total={processedData.totalExpense} />
                 </div>
               </div>
             </div>
