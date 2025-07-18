@@ -1,490 +1,695 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { PieChart, Pie, Cell, ResponsiveContainer, Sector } from 'recharts';
-import { Search, Loader, AlertCircle, TrendingUp, TrendingDown, DollarSign, Wallet, LayoutDashboard, List, ChevronDown, ChevronUp, Database, Edit, Trash2, X } from 'lucide-react';
+# ==============================================================================
+# ||                               MEU GESTOR - BACKEND PRINCIPAL (com API)                               ||
+# ==============================================================================
+# Este arquivo contém toda a lógica para o assistente financeiro do WhatsApp
+# e a nova API para servir dados ao dashboard.
 
-// Cores para o gráfico e cards
-const COLORS = ['#3b82f6', '#10b981', '#f97316', '#ef4444', '#8b5cf6', '#ec4899', '#f59e0b'];
+# --- Importações de Bibliotecas ---
+import logging
+import json
+import os
+import re
+from datetime import datetime, date, timedelta, time
+from typing import List, Tuple, Optional
 
-// --- Componentes da UI ---
+# Terceiros
+import requests
+import openai
+from dotenv import load_dotenv
+from pydub import AudioSegment
+from fastapi import FastAPI, Request, Depends, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+from sqlalchemy.orm import Session
+from sqlalchemy import (create_engine, Column, Integer, String, Numeric,
+                        DateTime, ForeignKey, func, and_)
+from sqlalchemy.orm import sessionmaker, declarative_base, relationship
+from sqlalchemy.exc import SQLAlchemyError
 
-const Header = ({ onFetch, loading, phoneNumber, setPhoneNumber, activeView, setActiveView }) => (
-  <header className="bg-white shadow-sm sticky top-0 z-20">
-    <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-      <div className="py-4 flex flex-wrap justify-between items-center gap-4 border-b border-gray-200">
-        <div className="flex items-center gap-3">
-          <Wallet className="text-blue-600" size={28} />
-          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Meu Gestor</h1>
-        </div>
-        <div className="flex items-center space-x-2">
-          <input
-            type="tel"
-            value={phoneNumber}
-            onChange={(e) => setPhoneNumber(e.target.value)}
-            placeholder="Seu nº WhatsApp (só números)"
-            className="p-2 border rounded-md focus:ring-2 focus:ring-blue-500 transition w-40 sm:w-48"
-            onKeyPress={(e) => e.key === 'Enter' && onFetch()}
-          />
-          <button
-            onClick={onFetch}
-            disabled={loading}
-            className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition flex items-center disabled:bg-gray-400"
-          >
-            {loading ? <Loader className="animate-spin sm:mr-2" size={20}/> : <Search size={20} className="sm:mr-2"/>}
-            <span className="hidden sm:inline">Carregar</span>
-          </button>
-        </div>
-      </div>
-      <nav className="flex space-x-4 sm:space-x-8 -mb-px">
-        <button 
-          onClick={() => setActiveView('visaoGeral')}
-          className={`py-3 px-1 text-sm font-medium border-b-2 flex items-center gap-2 ${activeView === 'visaoGeral' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
-        >
-          <LayoutDashboard size={16} /> Visão Geral
-        </button>
-        <button 
-          onClick={() => setActiveView('categorias')}
-          className={`py-3 px-1 text-sm font-medium border-b-2 flex items-center gap-2 ${activeView === 'categorias' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
-        >
-          <List size={16} /> Categorias
-        </button>
-        {/* --- NOVO BOTÃO PARA A TABELA --- */}
-        <button 
-          onClick={() => setActiveView('tabela')}
-          className={`py-3 px-1 text-sm font-medium border-b-2 flex items-center gap-2 ${activeView === 'tabela' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
-        >
-          <Database size={16} /> Tabela
-        </button>
-      </nav>
-    </div>
-  </header>
-);
 
-const StatCard = ({ title, value, icon, colorClass }) => (
-    <div className="bg-white p-4 rounded-lg shadow flex-1">
-      <div className="flex items-center">
-        <div className={`p-2 rounded-lg mr-4 ${colorClass}`}>
-          {icon}
-        </div>
-        <div>
-          <p className="text-sm text-gray-500">{title}</p>
-          <p className="text-xl font-bold text-gray-800">R$ {value.toFixed(2).replace('.', ',')}</p>
-        </div>
-      </div>
-    </div>
-);
+# ==============================================================================
+# ||                               CONFIGURAÇÃO E INICIALIZAÇÃO                               ||
+# ==============================================================================
 
-const renderActiveShape = (props) => {
-    const { cx, cy, innerRadius, outerRadius, startAngle, endAngle, fill, payload } = props;
-    return (
-      <g>
-        <text x={cx} y={cy - 5} dy={8} textAnchor="middle" fill="#333" className="font-bold text-2xl">
-          R$ {payload.value.toFixed(2).replace('.', ',')}
-        </text>
-        <text x={cx} y={cy + 20} dy={8} textAnchor="middle" fill="#999" className="text-sm">
-          Total Pago
-        </text>
-        <Sector cx={cx} cy={cy} innerRadius={innerRadius} outerRadius={outerRadius} startAngle={startAngle} endAngle={endAngle} fill={fill} stroke="#fff" />
-      </g>
-    );
-};
+# Carrega variáveis de ambiente do arquivo .env
+load_dotenv()
 
-const CategoryDetails = ({ data, total }) => (
-    <div className="w-full space-y-3">
-        {data.map((entry, index) => {
-            const percentage = total > 0 ? (entry.value / total * 100).toFixed(1) : 0;
-            return (
-                <div key={`item-${index}`} className="flex items-center justify-between text-sm hover:bg-gray-50 p-1 rounded">
-                    <div className="flex items-center">
-                        <div className="w-3 h-3 rounded-full mr-3" style={{ backgroundColor: COLORS[index % COLORS.length] }}></div>
-                        <span className="text-gray-700">{entry.name}</span>
-                    </div>
-                    <div className="flex items-center">
-                        <span className="font-bold text-gray-800 mr-2">R$ {entry.value.toFixed(2).replace('.', ',')}</span>
-                        <span className="text-gray-500 text-xs w-12 text-right">{percentage}%</span>
-                    </div>
-                </div>
-            )
-        })}
-    </div>
-);
+# Configuração do logging para observar o comportamento da aplicação
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-const VisaoGeralView = ({ stats }) => (
-    <div className="space-y-8">
-        <div className="flex flex-col sm:flex-row gap-4 sm:gap-6">
-            <StatCard title="Receitas" value={stats.totalIncome} icon={<TrendingUp size={24} className="text-green-600"/>} colorClass="bg-green-100"/>
-            <StatCard title="Despesas" value={stats.totalExpense} icon={<TrendingDown size={24} className="text-red-600"/>} colorClass="bg-red-100"/>
-            <StatCard title="Balanço" value={stats.balance} icon={<DollarSign size={24} className="text-blue-600"/>} colorClass="bg-blue-100"/>
-        </div>
-        <div className="bg-white p-6 rounded-lg shadow">
-            <h3 className="text-lg font-semibold text-gray-800 mb-4">Despesas por Categoria</h3>
-            <div className="flex flex-col md:flex-row gap-8 items-center">
-                <div className="w-full md:w-1/2 lg:w-2/5">
-                    <ResponsiveContainer width="100%" height={250}>
-                        <PieChart>
-                            <Pie data={stats.expenseByCategory} cx="50%" cy="50%" innerRadius={70} outerRadius={100} fill="#8884d8" paddingAngle={2} dataKey="value" activeShape={renderActiveShape} activeIndex={0}>
-                                {stats.expenseByCategory.map((entry, index) => (
-                                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                                ))}
-                            </Pie>
-                        </PieChart>
-                    </ResponsiveContainer>
-                </div>
-                <div className="w-full md:w-1/2 lg:w-3/5">
-                    <CategoryDetails data={stats.expenseByCategory} total={stats.totalExpense} />
-                </div>
-            </div>
-        </div>
-    </div>
-);
+# --- Variáveis de Ambiente ---
+DATABASE_URL = os.getenv("DATABASE_URL")
+DIFY_API_URL = os.getenv("DIFY_API_URL")
+DIFY_API_KEY = os.getenv("DIFY_API_KEY")
+EVOLUTION_API_URL = os.getenv("EVOLUTION_API_URL")
+EVOLUTION_INSTANCE_NAME = os.getenv("EVOLUTION_INSTANCE_NAME")
+EVOLUTION_API_KEY = os.getenv("EVOLUTION_API_KEY")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+FFMPEG_PATH = os.getenv("FFMPEG_PATH")
+DASHBOARD_URL = os.getenv("DASHBOARD_URL")
 
-const CategoriasView = ({ expensesGrouped }) => {
-    const [expandedCategory, setExpandedCategory] = useState(null);
 
-    const toggleCategory = (categoryName) => {
-        setExpandedCategory(expandedCategory === categoryName ? null : categoryName);
-    };
+# --- Inicialização de APIs e Serviços ---
+openai.api_key = OPENAI_API_KEY
 
-    return (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {Object.entries(expensesGrouped).map(([category, data], index) => {
-                const categoryTotal = data.reduce((sum, item) => sum + item.value, 0);
-                const isExpanded = expandedCategory === category;
-                return (
-                    <div key={category} className="bg-white rounded-lg shadow-md overflow-hidden flex flex-col">
-                        <button onClick={() => toggleCategory(category)} className="w-full flex justify-between items-center p-4 text-left hover:bg-gray-50 border-l-4" style={{ borderColor: COLORS[index % COLORS.length] }}>
-                           <div>
-                             <h3 className="font-bold text-lg text-gray-800">{category}</h3>
-                             <p className="text-2xl font-bold text-gray-900 mt-1">R$ {categoryTotal.toFixed(2).replace('.', ',')}</p>
-                           </div>
-                           {isExpanded ? <ChevronUp size={20} className="text-gray-500"/> : <ChevronDown size={20} className="text-gray-500"/>}
-                        </button>
-                        {isExpanded && (
-                            <div className="border-t p-4">
-                                <ul className="space-y-2">
-                                    {data.map(expense => (
-                                        <li key={expense.id} className="flex justify-between text-sm text-gray-600 border-b pb-1">
-                                            <span className="truncate pr-2">{expense.description}</span>
-                                            <span className="font-medium whitespace-nowrap">R$ {expense.value.toFixed(2).replace('.', ',')}</span>
-                                        </li>
-                                    ))}
-                                </ul>
-                            </div>
-                        )}
-                    </div>
-                )
-            })}
-        </div>
-    );
-};
+if FFMPEG_PATH and os.path.exists(FFMPEG_PATH):
+    AudioSegment.converter = FFMPEG_PATH
+    logging.info(f"Pydub configurado para usar FFmpeg em: {FFMPEG_PATH}")
+else:
+    logging.warning("Caminho para FFMPEG_PATH não encontrado ou inválido. O processamento de áudio pode falhar.")
 
-// --- NOVO: Componente Modal Genérico ---
-const Modal = ({ isOpen, onClose, title, children }) => {
-    if (!isOpen) return null;
-    return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center p-4">
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
-                <div className="flex justify-between items-center p-4 border-b">
-                    <h3 className="text-lg font-semibold text-gray-800">{title}</h3>
-                    <button onClick={onClose} className="text-gray-500 hover:text-gray-800">
-                        <X size={24} />
-                    </button>
-                </div>
-                <div className="p-6">
-                    {children}
-                </div>
-            </div>
-        </div>
-    );
-};
+try:
+    engine = create_engine(DATABASE_URL)
+    SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+    Base = declarative_base()
+    logging.info("Conexão com o banco de dados estabelecida com sucesso.")
+except Exception as e:
+    logging.error(f"Erro fatal ao conectar ao banco de dados: {e}")
+    exit()
 
-// --- NOVO: Componente Tabela de Transações ---
-const TabelaTransacoesView = ({ transactions, setTransactions, phoneNumber, categories }) => {
-    const [filterText, setFilterText] = useState('');
-    const [filterCategory, setFilterCategory] = useState('all');
-    const [startDate, setStartDate] = useState('');
-    const [endDate, setEndDate] = useState('');
+
+# ==============================================================================
+# ||                               MODELOS DO BANCO DE DADOS (SQLALCHEMY)                               ||
+# ==============================================================================
+
+class User(Base):
+    """Modelo da tabela de usuários."""
+    __tablename__ = "users"
+    id = Column(Integer, primary_key=True, index=True)
+    phone_number = Column(String, unique=True, index=True, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    expenses = relationship("Expense", back_populates="user")
+    incomes = relationship("Income", back_populates="user")
+    reminders = relationship("Reminder", back_populates="user")
+
+class Expense(Base):
+    """Modelo da tabela de despesas."""
+    __tablename__ = "expenses"
+    id = Column(Integer, primary_key=True, index=True)
+    description = Column(String, nullable=False)
+    value = Column(Numeric(10, 2), nullable=False)
+    category = Column(String)
+    transaction_date = Column(DateTime, default=datetime.utcnow)
+    user_id = Column(Integer, ForeignKey("users.id"))
+    user = relationship("User", back_populates="expenses")
+
+class Income(Base):
+    """Modelo da tabela de rendas/créditos."""
+    __tablename__ = "incomes"
+    id = Column(Integer, primary_key=True, index=True)
+    description = Column(String, nullable=False)
+    value = Column(Numeric(10, 2), nullable=False)
+    transaction_date = Column(DateTime, default=datetime.utcnow)
+    user_id = Column(Integer, ForeignKey("users.id"))
+    user = relationship("User", back_populates="incomes")
+
+class Reminder(Base):
+    """Modelo da tabela de lembretes."""
+    __tablename__ = "reminders"
+    id = Column(Integer, primary_key=True, index=True)
+    description = Column(String, nullable=False)
+    due_date = Column(DateTime, nullable=False)
+    is_sent = Column(String, default='false')
+    user_id = Column(Integer, ForeignKey("users.id"))
+    user = relationship("User", back_populates="reminders")
+
+# Cria as tabelas no banco de dados, se não existirem
+Base.metadata.create_all(bind=engine)
+
+# --- Modelos Pydantic para validação de dados da API ---
+class ExpenseUpdate(BaseModel):
+    description: str
+    value: float
+    category: Optional[str] = None
+
+class IncomeUpdate(BaseModel):
+    description: str
+    value: float
+
+def get_db():
+    """Função de dependência do FastAPI para obter uma sessão de DB."""
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+
+# ==============================================================================
+# ||                               FUNÇÕES DE LÓGICA DE BANCO DE DADOS                               ||
+# ==============================================================================
+
+def get_or_create_user(db: Session, phone_number: str) -> User:
+    """Busca um usuário pelo número de telefone ou cria um novo se não existir."""
+    user = db.query(User).filter(User.phone_number == phone_number).first()
+    if not user:
+        logging.info(f"Criando novo usuário para o número: {phone_number}")
+        user = User(phone_number=phone_number)
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+    return user
+
+def add_expense(db: Session, user: User, expense_data: dict):
+    """Adiciona uma nova despesa para um usuário no banco de dados."""
+    logging.info(f"Adicionando despesa para o usuário {user.id}...")
+    new_expense = Expense(
+        description=expense_data.get("description"),
+        value=expense_data.get("value"),
+        category=expense_data.get("category"),
+        user_id=user.id
+    )
+    db.add(new_expense)
+    db.commit()
+
+def add_income(db: Session, user: User, income_data: dict):
+    """Adiciona uma nova renda para um usuário no banco de dados."""
+    logging.info(f"Adicionando renda para o usuário {user.id}...")
+    new_income = Income(
+        description=income_data.get("description"),
+        value=income_data.get("value"),
+        user_id=user.id
+    )
+    db.add(new_income)
+    db.commit()
+
+def add_reminder(db: Session, user: User, reminder_data: dict):
+    """Adiciona um novo lembrete para um usuário no banco de dados."""
+    logging.info(f"Adicionando lembrete para o usuário {user.id}...")
+    new_reminder = Reminder(
+        description=reminder_data.get("description"),
+        due_date=reminder_data.get("due_date"),
+        user_id=user.id
+    )
+    db.add(new_reminder)
+    db.commit()
+
+def get_expenses_summary(db: Session, user: User, period: str, category: str = None) -> Tuple[List[Expense], float, datetime, datetime] | None:
+    """Busca a lista de despesas, o valor total e o intervalo de datas para um período."""
+    logging.info(f"Buscando resumo de despesas para o usuário {user.id}, período '{period}', categoria '{category}'")
     
-    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-    const [selectedTransaction, setSelectedTransaction] = useState(null);
+    brt_offset = timedelta(hours=-3)
+    now_brt = datetime.utcnow() + brt_offset
+
+    start_of_today_brt = now_brt.replace(hour=0, minute=0, second=0, microsecond=0)
+    end_of_today_brt = start_of_today_brt + timedelta(days=1)
+
+    start_brt, end_brt = None, None
+    period_lower = period.lower()
+    dynamic_days_match = re.search(r'últimos (\d+) dias', period_lower)
+
+    if "mês" in period_lower:
+        start_brt = start_of_today_brt.replace(day=1)
+        end_brt = end_of_today_brt
+    elif "hoje" in period_lower:
+        start_brt = start_of_today_brt
+        end_brt = end_of_today_brt
+    elif "ontem" in period_lower:
+        start_brt = start_of_today_brt - timedelta(days=1)
+        end_brt = start_of_today_brt
+    elif "semana" in period_lower or "7 dias" in period_lower:
+        start_brt = start_of_today_brt - timedelta(days=6)
+        end_brt = end_of_today_brt
+    elif dynamic_days_match:
+        days = int(dynamic_days_match.group(1))
+        start_brt = start_of_today_brt - timedelta(days=days - 1)
+        end_brt = end_of_today_brt
     
-    const API_BASE_URL = 'https://meu-gestor-fernando.onrender.com';
+    if start_brt and end_brt:
+        start_date_utc = start_brt - brt_offset
+        end_date_utc = end_brt - brt_offset
 
-    const filteredTransactions = useMemo(() => {
-        return transactions.filter(t => {
-            const transactionDate = new Date(t.date);
-            const start = startDate ? new Date(startDate) : null;
-            const end = endDate ? new Date(endDate) : null;
-
-            if (start && transactionDate < start) return false;
-            if (end) {
-                const endOfDay = new Date(end);
-                endOfDay.setHours(23, 59, 59, 999);
-                if (transactionDate > endOfDay) return false;
-            }
-            if (filterCategory !== 'all' && (t.category || 'Outros') !== filterCategory) return false;
-            if (filterText && !t.description.toLowerCase().includes(filterText.toLowerCase())) return false;
+        query = db.query(Expense).filter(
+            Expense.user_id == user.id,
+            Expense.transaction_date >= start_date_utc,
+            Expense.transaction_date < end_date_utc
+        )
+        if category:
+            query = query.filter(Expense.category == category)
             
-            return true;
-        });
-    }, [transactions, filterCategory, filterText, startDate, endDate]);
+        expenses = query.order_by(Expense.transaction_date.asc()).all()
+        total_value = sum(expense.value for expense in expenses)
+        return expenses, total_value, start_brt, end_brt
+    
+    return None, 0.0, None, None
 
-    const handleEdit = (transaction) => {
-        setSelectedTransaction(transaction);
-        setIsEditModalOpen(true);
-    };
+def get_incomes_summary(db: Session, user: User, period: str) -> Tuple[List[Income], float] | None:
+    """Busca a lista de rendas e o valor total para um determinado período."""
+    logging.info(f"Buscando resumo de créditos para o usuário {user.id} no período '{period}'")
 
-    const handleDelete = (transaction) => {
-        setSelectedTransaction(transaction);
-        setIsDeleteModalOpen(true);
-    };
+    brt_offset = timedelta(hours=-3)
+    now_brt = datetime.utcnow() + brt_offset
 
-    const confirmDelete = async () => {
-        if (!selectedTransaction) return;
-        const { id, type } = selectedTransaction;
-        const cleanPhoneNumber = phoneNumber.replace(/\D/g, '');
-        const endpoint = type === 'expense' 
-            ? `/api/expense/${id}?phone_number=${cleanPhoneNumber}` 
-            : `/api/income/${id}?phone_number=${cleanPhoneNumber}`;
-        
-        try {
-            const response = await fetch(`${API_BASE_URL}${endpoint}`, { method: 'DELETE' });
-            if (!response.ok) throw new Error('Falha ao apagar.');
+    start_of_today_brt = now_brt.replace(hour=0, minute=0, second=0, microsecond=0)
+    end_of_today_brt = start_of_today_brt + timedelta(days=1)
+
+    start_brt, end_brt = None, None
+    period_lower = period.lower()
+    dynamic_days_match = re.search(r'últimos (\d+) dias', period_lower)
+
+    if "mês" in period_lower:
+        start_brt = start_of_today_brt.replace(day=1)
+        end_brt = end_of_today_brt
+    elif "hoje" in period_lower:
+        start_brt = start_of_today_brt
+        end_brt = end_of_today_brt
+    elif "ontem" in period_lower:
+        start_brt = start_of_today_brt - timedelta(days=1)
+        end_brt = start_of_today_brt
+    elif "semana" in period_lower or "7 dias" in period_lower:
+        start_brt = start_of_today_brt - timedelta(days=6)
+        end_brt = end_of_today_brt
+    elif dynamic_days_match:
+        days = int(dynamic_days_match.group(1))
+        start_brt = start_of_today_brt - timedelta(days=days - 1)
+        end_brt = end_of_today_brt
+
+    if start_brt and end_brt:
+        start_date_utc = start_brt - brt_offset
+        end_date_utc = end_brt - brt_offset
+
+        query = db.query(Income).filter(
+            Income.user_id == user.id,
+            Income.transaction_date >= start_date_utc,
+            Income.transaction_date < end_date_utc
+        )
             
-            setTransactions(prev => prev.filter(t => !(t.id === id && t.type === type)));
-            setIsDeleteModalOpen(false);
-            setSelectedTransaction(null);
-        } catch (err) {
-            alert(`Erro: ${err.message}`);
-        }
-    };
+        incomes = query.order_by(Income.transaction_date.asc()).all()
+        total_value = sum(income.value for income in incomes)
+        return incomes, total_value
+    
+    return None, 0.0
 
-    const handleUpdate = async (e) => {
-        e.preventDefault();
-        if (!selectedTransaction) return;
-        const { id, type } = selectedTransaction;
-        const cleanPhoneNumber = phoneNumber.replace(/\D/g, '');
-        const endpoint = type === 'expense' 
-            ? `/api/expense/${id}?phone_number=${cleanPhoneNumber}` 
-            : `/api/income/${id}?phone_number=${cleanPhoneNumber}`;
-        
-        const updatedData = {
-            description: e.target.description.value,
-            value: parseFloat(e.target.value.value),
-            ...(type === 'expense' && { category: e.target.category.value })
-        };
+def delete_last_expense(db: Session, user: User) -> dict | None:
+    """Encontra e apaga a última despesa registrada por um usuário."""
+    logging.info(f"Tentando apagar a última despesa do usuário {user.id}")
+    last_expense = db.query(Expense).filter(Expense.user_id == user.id).order_by(Expense.id.desc()).first()
+    if last_expense:
+        deleted_details = {"description": last_expense.description, "value": float(last_expense.value)}
+        db.delete(last_expense)
+        db.commit()
+        return deleted_details
+    return None
 
-        try {
-            const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(updatedData),
-            });
-            if (!response.ok) throw new Error('Falha ao atualizar.');
-            const result = await response.json();
-            
-            setTransactions(prev => prev.map(t => (t.id === id && t.type === type) ? { ...t, ...result, date: result.transaction_date || t.date } : t));
-            setIsEditModalOpen(false);
-            setSelectedTransaction(null);
-        } catch (err) {
-            alert(`Erro: ${err.message}`);
-        }
-    };
-
-    return (
-        <div className="bg-white p-6 rounded-lg shadow-md">
-            <h2 className="text-xl font-semibold text-gray-800 mb-4">Todas as Transações</h2>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="p-2 border rounded-md" />
-                <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="p-2 border rounded-md" />
-                <select value={filterCategory} onChange={e => setFilterCategory(e.target.value)} className="p-2 border rounded-md">
-                    <option value="all">Todas as Categorias</option>
-                    {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
-                </select>
-                <input type="text" value={filterText} onChange={e => setFilterText(e.target.value)} placeholder="Pesquisar descrição..." className="p-2 border rounded-md" />
-            </div>
-
-            <div className="overflow-x-auto">
-                <table className="w-full text-sm text-left text-gray-500">
-                    <thead className="text-xs text-gray-700 uppercase bg-gray-50">
-                        <tr>
-                            <th scope="col" className="px-6 py-3">Data</th>
-                            <th scope="col" className="px-6 py-3">Descrição</th>
-                            <th scope="col" className="px-6 py-3">Categoria</th>
-                            <th scope="col" className="px-6 py-3">Valor</th>
-                            <th scope="col" className="px-6 py-3">Ações</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {filteredTransactions.map(t => (
-                            <tr key={`${t.type}-${t.id}`} className={`border-b ${t.type === 'income' ? 'bg-green-50' : 'bg-red-50'}`}>
-                                <td className="px-6 py-4">{new Date(t.date).toLocaleDateString('pt-BR')}</td>
-                                <td className="px-6 py-4 font-medium text-gray-900">{t.description}</td>
-                                <td className="px-6 py-4">{t.category || 'N/A'}</td>
-                                <td className={`px-6 py-4 font-bold ${t.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>
-                                    {t.type === 'income' ? '+' : '-'} R$ {t.value.toFixed(2).replace('.',',')}
-                                </td>
-                                <td className="px-6 py-4 flex items-center gap-3">
-                                    <button onClick={() => handleEdit(t)} className="text-blue-600 hover:text-blue-800"><Edit size={16} /></button>
-                                    <button onClick={() => handleDelete(t)} className="text-red-600 hover:text-red-800"><Trash2 size={16} /></button>
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </div>
-            {filteredTransactions.length === 0 && <p className="text-center text-gray-500 mt-6">Nenhuma transação encontrada para os filtros selecionados.</p>}
-
-            <Modal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} title="Editar Transação">
-                {selectedTransaction && (
-                    <form onSubmit={handleUpdate}>
-                        <div className="mb-4">
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Descrição</label>
-                            <input type="text" name="description" defaultValue={selectedTransaction.description} className="p-2 border rounded-md w-full" required />
-                        </div>
-                        <div className="mb-4">
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Valor</label>
-                            <input type="number" step="0.01" name="value" defaultValue={selectedTransaction.value} className="p-2 border rounded-md w-full" required />
-                        </div>
-                        {selectedTransaction.type === 'expense' && (
-                            <div className="mb-6">
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Categoria</label>
-                                <input type="text" name="category" defaultValue={selectedTransaction.category} className="p-2 border rounded-md w-full" />
-                            </div>
-                        )}
-                        <div className="flex justify-end gap-3 mt-6">
-                            <button type="button" onClick={() => setIsEditModalOpen(false)} className="bg-gray-200 text-gray-800 px-4 py-2 rounded-md hover:bg-gray-300">Cancelar</button>
-                            <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">Salvar</button>
-                        </div>
-                    </form>
-                )}
-            </Modal>
-
-            <Modal isOpen={isDeleteModalOpen} onClose={() => setIsDeleteModalOpen(false)} title="Confirmar Exclusão">
-                {selectedTransaction && (
-                    <div>
-                        <p className="text-gray-700 mb-6">Tem a certeza que deseja apagar a transação: "{selectedTransaction.description}"?</p>
-                        <div className="flex justify-end gap-3">
-                            <button type="button" onClick={() => setIsDeleteModalOpen(false)} className="bg-gray-200 text-gray-800 px-4 py-2 rounded-md hover:bg-gray-300">Cancelar</button>
-                            <button type="button" onClick={confirmDelete} className="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700">Apagar</button>
-                        </div>
-                    </div>
-                )}
-            </Modal>
-        </div>
-    );
-};
+def edit_last_expense_value(db: Session, user: User, new_value: float) -> Expense | None:
+    """Encontra e edita o valor da última despesa registrada por um usuário."""
+    logging.info(f"Tentando editar o valor da última despesa do usuário {user.id} para {new_value}")
+    last_expense = db.query(Expense).filter(Expense.user_id == user.id).order_by(Expense.id.desc()).first()
+    if last_expense:
+        last_expense.value = new_value
+        db.commit()
+        db.refresh(last_expense)
+        return last_expense
+    return None
 
 
-// --- Componente Principal ---
-const App = () => {
-  const [phoneNumber, setPhoneNumber] = useState('');
-  const [apiData, setApiData] = useState(null);
-  const [allTransactions, setAllTransactions] = useState([]); // NOVO ESTADO
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [activeView, setActiveView] = useState('visaoGeral');
+# ==============================================================================
+# ||                               FUNÇÕES DE COMUNICAÇÃO COM APIS EXTERNAS                               ||
+# ==============================================================================
 
-  const handleFetchData = async () => {
-    if (!phoneNumber) { setError('Por favor, insira um número de telefone.'); return; }
-    setLoading(true); setError(null); setApiData(null);
-    try {
-      const API_URL = `https://meu-gestor-fernando.onrender.com/api/data/${phoneNumber}`;
-      const response = await fetch(API_URL);
-      if (!response.ok) throw new Error('Falha ao buscar dados. Verifique o número.');
-      const result = await response.json();
-      if (result.error) throw new Error(result.error);
-      setApiData(result);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
+def transcribe_audio(file_path: str) -> str | None:
+    """Transcreve um arquivo de áudio usando a API da OpenAI (Whisper)."""
+    logging.info(f"Enviando áudio '{file_path}' para transcrição...")
+    try:
+        with open(file_path, "rb") as audio_file:
+            transcription = openai.Audio.transcribe("whisper-1", audio_file)
+        text = transcription["text"]
+        logging.info(f"Transcrição bem-sucedida: '{text}'")
+        return text
+    except Exception as e:
+        logging.error(f"Erro na transcrição com Whisper: {e}")
+        return None
+
+def call_dify_api(user_id: str, text_query: str) -> dict | None:
+    """Envia uma consulta para o agente Dify e lida com respostas que não são JSON."""
+    headers = {"Authorization": DIFY_API_KEY, "Content-Type": "application/json"}
+    payload = {
+        "inputs": {"query": text_query},
+        "query": text_query,
+        "user": user_id,
+        "response_mode": "blocking"
     }
-  };
+    try:
+        logging.info(f"Payload enviado ao Dify:\n{json.dumps(payload, indent=2)}")
+        response = requests.post(f"{DIFY_API_URL}/chat-messages", headers=headers, json=payload, timeout=120)
+        response.raise_for_status()
+        answer_str = response.json().get("answer", "")
+        try:
+            return json.loads(answer_str)
+        except json.JSONDecodeError:
+            logging.warning(f"Dify retornou texto puro em vez de JSON: '{answer_str}'. Tratando como 'not_understood'.")
+            return {"action": "not_understood"}
+    except requests.exceptions.RequestException as e:
+        logging.error(f"Erro na chamada à API do Dify: {e.response.text if e.response else e}")
+        return None
 
-  // Efeito para combinar despesas e receitas num único array
-  useEffect(() => {
-    if (apiData) {
-        const expenses = apiData.expenses.map(e => ({ ...e, type: 'expense' }));
-        const incomes = apiData.incomes.map(i => ({ ...i, type: 'income' }));
-        setAllTransactions([...expenses, ...incomes].sort((a, b) => new Date(b.date) - new Date(a.date)));
+def send_whatsapp_message(phone_number: str, message: str):
+    """Envia uma mensagem de texto via Evolution API."""
+    url = f"{EVOLUTION_API_URL}/message/sendText/{EVOLUTION_INSTANCE_NAME}"
+    headers = {"apikey": EVOLUTION_API_KEY, "Content-Type": "application/json"}
+    clean_number = phone_number.split('@')[0]
+    payload = {"number": clean_number, "options": {"delay": 1200}, "text": message}
+    try:
+        logging.info(f"Enviando mensagem para {clean_number}: '{message}'")
+        requests.post(url, headers=headers, json=payload, timeout=30).raise_for_status()
+    except Exception as e:
+        logging.error(f"Erro ao enviar mensagem via WhatsApp: {e}")
+
+
+# ==============================================================================
+# ||                               LÓGICA DE PROCESSAMENTO                               ||
+# ==============================================================================
+
+def process_text_message(message_text: str, sender_number: str) -> dict | None:
+    """Processa uma mensagem de texto chamando a API do Dify."""
+    logging.info(f">>> PROCESSANDO TEXTO: [{sender_number}]")
+    dify_user_id = re.sub(r'\D', '', sender_number)
+    return call_dify_api(user_id=dify_user_id, text_query=message_text)
+
+def process_audio_message(message: dict, sender_number: str) -> dict | None:
+    """Processa uma mensagem de áudio: baixa, converte, transcreve e envia para o Dify."""
+    logging.info(f">>> PROCESSANDO ÁUDIO de [{sender_number}]")
+    media_url = message.get("url") or message.get("mediaUrl")
+    if not media_url:
+        logging.warning("Mensagem de áudio sem URL.")
+        return None
+
+    mp3_file_path = f"temp_audio_{sender_number}.mp3"
+    ogg_path = f"temp_audio_{sender_number}.ogg"
+    
+    try:
+        response = requests.get(media_url, timeout=30)
+        response.raise_for_status()
+        with open(ogg_path, "wb") as f:
+            f.write(response.content)
+        AudioSegment.from_ogg(ogg_path).export(mp3_file_path, format="mp3")
+        
+        transcribed_text = transcribe_audio(mp3_file_path)
+        if not transcribed_text:
+            return None
+        
+        dify_user_id = re.sub(r'\D', '', sender_number)
+        return call_dify_api(user_id=dify_user_id, text_query=transcribed_text)
+    finally:
+        if os.path.exists(ogg_path): os.remove(ogg_path)
+        if os.path.exists(mp3_file_path): os.remove(mp3_file_path)
+
+def handle_dify_action(dify_result: dict, user: User, db: Session):
+    """Executa a lógica apropriada baseada na ação retornada pelo Dify."""
+    action = dify_result.get("action")
+    sender_number = user.phone_number
+    
+    try:
+        if action == "register_expense":
+            add_expense(db, user=user, expense_data=dify_result)
+            valor = float(dify_result.get('value', 0))
+            descricao = dify_result.get('description', 'N/A')
+            confirmation = f"✅ Despesa de R$ {valor:.2f} ({descricao}) registrada com sucesso!"
+            send_whatsapp_message(sender_number, confirmation)
+
+        elif action == "register_income":
+            add_income(db, user=user, income_data=dify_result)
+            valor = float(dify_result.get('value', 0))
+            descricao = dify_result.get('description', 'N/A')
+            confirmation = f"💰 Crédito de R$ {valor:.2f} ({descricao}) registrado com sucesso!"
+            send_whatsapp_message(sender_number, confirmation)
+
+        elif action == "create_reminder":
+            add_reminder(db, user=user, reminder_data=dify_result)
+            descricao = dify_result.get('description', 'N/A')
+            due_date_str = dify_result.get('due_date')
+            try:
+                due_date_obj = datetime.fromisoformat(due_date_str)
+                data_formatada = due_date_obj.strftime('%d/%m/%Y às %H:%M')
+                confirmation = f"🗓️ Lembrete agendado: '{descricao}' para {data_formatada}."
+            except (ValueError, TypeError):
+                confirmation = f"🗓️ Lembrete '{descricao}' agendado com sucesso!"
+            send_whatsapp_message(sender_number, confirmation)
+
+        elif action == "get_dashboard_link":
+            if not DASHBOARD_URL:
+                logging.error("A variável de ambiente DASHBOARD_URL não foi configurada no Render.")
+                send_whatsapp_message(sender_number, "Desculpe, a funcionalidade de link para o painel não está configurada corretamente pelo administrador.")
+                return
+            message = f"Olá! Acesse seu painel de controle pessoal aqui: {DASHBOARD_URL}"
+            send_whatsapp_message(sender_number, message)
+
+        elif action == "get_summary":
+            period = dify_result.get("period", "período não identificado")
+            category = dify_result.get("category")
+            
+            expense_data = get_expenses_summary(db, user=user, period=period, category=category)
+            if expense_data is None or expense_data[2] is None:
+                send_whatsapp_message(sender_number, f"Não consegui entender o período '{period}'. Tente 'hoje', 'ontem', 'este mês', ou 'últimos X dias'.")
+                return
+            expenses, total_expenses, start_date, end_date = expense_data
+
+            income_data = get_incomes_summary(db, user=user, period=period)
+            incomes, total_incomes = (income_data if income_data else ([], 0.0))
+            
+            balance = total_incomes - total_expenses
+
+            start_date_str = start_date.strftime('%d/%m/%Y')
+            end_date_str = (end_date - timedelta(days=1)).strftime('%d/%m/%Y')
+
+            summary_message = f"Vamos lá! No período de {start_date_str} a {end_date_str}, este é o seu balanço:\n\n"
+
+            f_total_incomes = f"{total_incomes:.2f}".replace('.', ',')
+            summary_message += f"💰 *Créditos: R$ {f_total_incomes}*\n"
+            if incomes:
+                for income in incomes:
+                    date_str = (income.transaction_date + timedelta(hours=-3)).strftime('%d/%m/%Y')
+                    f_income_value = f"{income.value:.2f}".replace('.', ',')
+                    summary_message += f"- {date_str}: {income.description} - R$ {f_income_value}\n"
+            else:
+                summary_message += "- Nenhum crédito no período.\n"
+            summary_message += "\n"
+
+            summary_message += "💸 *Despesas*\n"
+            if not expenses:
+                summary_message += "- Nenhuma despesa no período. 🎉\n"
+            else:
+                expenses_by_category = {}
+                category_emojis = {
+                    "Alimentação": "🍽️", "Transporte": "🚗", "Moradia": "🏠", 
+                    "Lazer": "🎉", "Saúde": "❤️‍🩹", "Educação": "🎓", "Outros": "🛒"
+                }
+
+                for expense in expenses:
+                    cat = expense.category if expense.category else "Outros"
+                    if cat not in expenses_by_category:
+                        expenses_by_category[cat] = {"items": [], "total": 0}
+                    expenses_by_category[cat]["items"].append(expense)
+                    expenses_by_category[cat]["total"] += expense.value
+
+                sorted_categories = sorted(expenses_by_category.items(), key=lambda item: item[1]['total'], reverse=True)
+
+                for cat, data in sorted_categories:
+                    emoji = category_emojis.get(cat, "🛒")
+                    summary_message += f"\n{emoji} *{cat}*\n"
+                    for expense in data["items"]:
+                        date_str = (expense.transaction_date + timedelta(hours=-3)).strftime('%d/%m/%Y')
+                        f_expense_value = f"{expense.value:.2f}".replace('.', ',')
+                        summary_message += f"- {date_str}: {expense.description} - R$ {f_expense_value}\n"
+                    
+                    f_cat_total = f"{data['total']:.2f}".replace('.', ',')
+                    summary_message += f"*Subtotal {cat}: R$ {f_cat_total}*\n"
+            
+            f_balance = f"{balance:.2f}".replace('.', ',')
+            balance_emoji = "📈" if balance >= 0 else "📉"
+            summary_message += f"\n--------------------\n"
+            summary_message += f"{balance_emoji} *Balanço Final: R$ {f_balance}*\n\n"
+            
+            if DASHBOARD_URL:
+                summary_message += f"Se precisar de mais detalhes ou visualizar os gráficos dos seus gastos, você pode acessar a plataforma web em {DASHBOARD_URL} 😉"
+            
+            send_whatsapp_message(sender_number, summary_message)
+        
+        elif action == "delete_last_expense":
+            deleted_expense = delete_last_expense(db, user=user)
+            if deleted_expense:
+                valor_f = deleted_expense.get('value', 0)
+                descricao = deleted_expense.get('description', 'N/A')
+                confirmation = f"🗑️ Despesa anterior ('{descricao}' de R$ {valor_f:.2f}) foi removida."
+                send_whatsapp_message(sender_number, confirmation)
+            else:
+                send_whatsapp_message(sender_number, "🤔 Não encontrei nenhuma despesa para apagar.")
+        
+        elif action == "edit_last_expense_value":
+            new_value = float(dify_result.get("new_value", 0))
+            updated_expense = edit_last_expense_value(db, user=user, new_value=new_value)
+            if updated_expense:
+                descricao = updated_expense.description
+                confirmation = f"✏️ Valor da despesa '{descricao}' corrigido para *R$ {updated_expense.value:.2f}*."
+                send_whatsapp_message(sender_number, confirmation)
+            else:
+                send_whatsapp_message(sender_number, "🤔 Não encontrei nenhuma despesa para editar.")
+
+        else: # "not_understood" ou qualquer outra ação
+            fallback = "Não entendi. Tente de novo. Ex: 'gastei 50 no mercado', 'recebi 1000 de salário', 'resumo do mês'."
+            send_whatsapp_message(sender_number, fallback)
+
+    except Exception as e:
+        logging.error(f"Erro ao manusear a ação '{action}': {e}")
+        send_whatsapp_message(sender_number, "❌ Ocorreu um erro interno ao processar seu pedido.")
+
+
+# ==============================================================================
+# ||                               APLICAÇÃO FASTAPI (ROTAS)                               ||
+# ==============================================================================
+
+app = FastAPI()
+
+# Configuração do CORS para permitir acesso do dashboard
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+@app.get("/")
+def read_root():
+    """Rota principal para verificar se o servidor está online."""
+    return {"Status": "Meu Gestor Backend está online!"}
+
+@app.get("/api/data/{phone_number}")
+def get_user_data(phone_number: str, db: Session = Depends(get_db)):
+    """Busca todos os dados financeiros para um determinado número de telefone."""
+    logging.info(f"Recebida requisição de dados para o número: {phone_number}")
+    
+    cleaned_number = re.sub(r'\D', '', phone_number)
+    
+    if not cleaned_number.startswith('55'):
+        cleaned_number = f"55{cleaned_number}"
+
+    phone_number_jid = f"{cleaned_number}@s.whatsapp.net"
+    
+    logging.info(f"Buscando no banco de dados por: {phone_number_jid}")
+
+    user = db.query(User).filter(User.phone_number == phone_number_jid).first()
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuário não encontrado")
+        
+    expenses = db.query(Expense).filter(Expense.user_id == user.id).order_by(Expense.transaction_date.desc()).all()
+    incomes = db.query(Income).filter(Income.user_id == user.id).order_by(Income.transaction_date.desc()).all()
+    
+    expenses_data = [{"id": e.id, "description": e.description, "value": float(e.value), "category": e.category, "date": e.transaction_date.isoformat()} for e in expenses]
+    incomes_data = [{"id": i.id, "description": i.description, "value": float(i.value), "date": i.transaction_date.isoformat()} for i in incomes]
+    
+    return {
+        "user_id": user.id,
+        "phone_number": user.phone_number,
+        "expenses": expenses_data,
+        "incomes": incomes_data
     }
-  }, [apiData]);
 
-  const processedData = useMemo(() => {
-    if (!apiData) return null;
+# --- NOVAS ROTAS PARA EDIÇÃO E EXCLUSÃO ---
 
-    const totalIncome = apiData.incomes.reduce((sum, item) => sum + item.value, 0);
-    const totalExpense = apiData.expenses.reduce((sum, item) => sum + item.value, 0);
-    const balance = totalIncome - totalExpense;
-
-    const expenseByCategory = apiData.expenses.reduce((acc, expense) => {
-      const category = expense.category || 'Outros';
-      const existing = acc.find(item => item.name === category);
-      if (existing) existing.value += expense.value;
-      else acc.push({ name: category, value: expense.value });
-      return acc;
-    }, []).sort((a, b) => b.value - a.value);
+def get_user_from_query(db: Session, phone_number: str) -> User:
+    """Função auxiliar para obter o usuário a partir do número de telefone na query."""
+    if not phone_number:
+        raise HTTPException(status_code=400, detail="Número de telefone é obrigatório.")
     
-    const expensesGrouped = apiData.expenses.reduce((acc, expense) => {
-        const category = expense.category || 'Outros';
-        if (!acc[category]) {
-            acc[category] = [];
-        }
-        acc[category].push(expense);
-        return acc;
-    }, {});
+    cleaned_number = re.sub(r'\D', '', phone_number)
+    if not cleaned_number.startswith('55'):
+        cleaned_number = f"55{cleaned_number}"
+    phone_number_jid = f"{cleaned_number}@s.whatsapp.net"
     
-    const sortedExpensesGrouped = Object.entries(expensesGrouped)
-      .sort(([, aData], [, bData]) => {
-        const aTotal = aData.reduce((sum, item) => sum + item.value, 0);
-        const bTotal = bData.reduce((sum, item) => sum + item.value, 0);
-        return bTotal - aTotal;
-      })
-      .reduce((acc, [key, value]) => ({ ...acc, [key]: value }), {});
-      
-    const allCategories = Object.keys(sortedExpensesGrouped);
+    user = db.query(User).filter(User.phone_number == phone_number_jid).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuário não encontrado.")
+    return user
 
-    return { totalIncome, totalExpense, balance, expenseByCategory, expensesGrouped: sortedExpensesGrouped, allCategories };
-  }, [apiData]);
+@app.put("/api/expense/{expense_id}")
+def update_expense(expense_id: int, expense_data: ExpenseUpdate, phone_number: str, db: Session = Depends(get_db)):
+    user = get_user_from_query(db, phone_number)
+    expense = db.query(Expense).filter(Expense.id == expense_id, Expense.user_id == user.id).first()
+    if not expense:
+        raise HTTPException(status_code=404, detail="Despesa não encontrada.")
+    
+    expense.description = expense_data.description
+    expense.value = expense_data.value
+    expense.category = expense_data.category
+    db.commit()
+    db.refresh(expense)
+    return expense
 
-  return (
-    <div className="bg-gray-100 min-h-screen font-sans">
-      <Header onFetch={handleFetchData} loading={loading} phoneNumber={phoneNumber} setPhoneNumber={setPhoneNumber} activeView={activeView} setActiveView={setActiveView} />
-      
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {error && (
-          <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-6 rounded-md flex items-center">
-            <AlertCircle className="mr-3"/>
-            <span>{error}</span>
-          </div>
-        )}
+@app.delete("/api/expense/{expense_id}")
+def delete_expense(expense_id: int, phone_number: str, db: Session = Depends(get_db)):
+    user = get_user_from_query(db, phone_number)
+    expense = db.query(Expense).filter(Expense.id == expense_id, Expense.user_id == user.id).first()
+    if not expense:
+        raise HTTPException(status_code=404, detail="Despesa não encontrada.")
+    
+    db.delete(expense)
+    db.commit()
+    return {"status": "success", "message": "Despesa apagada."}
 
-        {!apiData && !loading && !error && (
-          <div className="text-center py-20 bg-white rounded-lg shadow">
-            <h2 className="text-xl font-semibold text-gray-700">Bem-vindo ao seu Painel Financeiro</h2>
-            <p className="text-gray-500 mt-2">Insira seu número de telefone e clique em carregar.</p>
-          </div>
-        )}
+@app.put("/api/income/{income_id}")
+def update_income(income_id: int, income_data: IncomeUpdate, phone_number: str, db: Session = Depends(get_db)):
+    user = get_user_from_query(db, phone_number)
+    income = db.query(Income).filter(Income.id == income_id, Income.user_id == user.id).first()
+    if not income:
+        raise HTTPException(status_code=404, detail="Crédito não encontrado.")
+        
+    income.description = income_data.description
+    income.value = income_data.value
+    db.commit()
+    db.refresh(income)
+    return income
 
-        {loading && (
-          <div className="text-center py-20">
-            <Loader className="animate-spin text-blue-600 mx-auto" size={48}/>
-            <p className="mt-4 text-gray-600">Analisando suas finanças...</p>
-          </div>
-        )}
+@app.delete("/api/income/{income_id}")
+def delete_income(income_id: int, phone_number: str, db: Session = Depends(get_db)):
+    user = get_user_from_query(db, phone_number)
+    income = db.query(Income).filter(Income.id == income_id, Income.user_id == user.id).first()
+    if not income:
+        raise HTTPException(status_code=404, detail="Crédito não encontrado.")
+        
+    db.delete(income)
+    db.commit()
+    return {"status": "success", "message": "Crédito apagado."}
 
-        {processedData && (
-          <>
-            {activeView === 'visaoGeral' && <VisaoGeralView stats={processedData} />}
-            {activeView === 'categorias' && <CategoriasView expensesGrouped={processedData.expensesGrouped} />}
-            {activeView === 'tabela' && <TabelaTransacoesView transactions={allTransactions} setTransactions={setAllTransactions} phoneNumber={phoneNumber} categories={processedData.allCategories} />}
-          </>
-        )}
-      </div>
-    </div>
-  );
-};
 
-export default App;
+@app.post("/webhook/evolution")
+async def evolution_webhook(request: Request, db: Session = Depends(get_db)):
+    """Rota principal que recebe os webhooks da Evolution API."""
+    data = await request.json()
+    logging.info(f"DADOS RECEBIDOS: {json.dumps(data, indent=2)}")
+
+    if data.get("event") != "messages.upsert":
+        return {"status": "evento_ignorado"}
+    message_data = data.get("data", {})
+    if message_data.get("key", {}).get("fromMe"):
+        return {"status": "mensagem_propria_ignorada"}
+    
+    sender_number = message_data.get("key", {}).get("remoteJid")
+    message = message_data.get("message", {})
+    if not sender_number or not message:
+        return {"status": "dados_insuficientes"}
+
+    dify_result = None
+    if "conversation" in message and message["conversation"]:
+        dify_result = process_text_message(message["conversation"], sender_number)
+    elif "audioMessage" in message:
+        dify_result = process_audio_message(message, sender_number)
+    else:
+        logging.info(f"Tipo de mensagem não suportado: {list(message.keys())}")
+        return {"status": "tipo_nao_suportado"}
+
+    if not dify_result:
+        logging.warning("Sem resultado do Dify. Abortando.")
+        return {"status": "falha_dify"}
+
+    user = get_or_create_user(db, phone_number=sender_number)
+    handle_dify_action(dify_result, user, db)
+
+    return {"status": "processado"}
+
+
+# Permite rodar o servidor com `python main.py` para desenvolvimento local
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
