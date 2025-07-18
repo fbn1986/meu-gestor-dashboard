@@ -409,17 +409,17 @@ const App = () => {
 
   const API_BASE_URL = 'https://meu-gestor-fernando.onrender.com';
 
-  // Função para buscar dados, agora aceita um número como argumento
-  const handleFetchData = async (numberToFetch = phoneNumber) => {
-    if (!numberToFetch) { 
-      setError('Por favor, insira um número de telefone.'); 
-      return; 
+  const handleFetchData = async (numberToFetch) => {
+    const finalNumber = numberToFetch || phoneNumber;
+    if (!finalNumber) {
+      setError('Por favor, insira um número de telefone.');
+      return;
     }
-    setLoading(true); 
-    setError(null); 
+    setLoading(true);
+    setError(null);
     setApiData(null);
     try {
-      const response = await fetch(`${API_BASE_URL}/api/data/${numberToFetch}`);
+      const response = await fetch(`${API_BASE_URL}/api/data/${finalNumber}`);
       if (!response.ok) throw new Error('Falha ao buscar dados. Verifique o número.');
       const result = await response.json();
       if (result.error) throw new Error(result.error);
@@ -431,7 +431,6 @@ const App = () => {
     }
   };
 
-  // Efeito para verificar o token na URL ao carregar a página
   useEffect(() => {
     const checkToken = async () => {
       const urlParams = new URLSearchParams(window.location.search);
@@ -442,13 +441,12 @@ const App = () => {
         try {
           const response = await fetch(`${API_BASE_URL}/api/verify-token/${token}`);
           if (!response.ok) {
-            throw new Error('Link de acesso inválido ou expirado.');
+            const errData = await response.json();
+            throw new Error(errData.detail || 'Link de acesso inválido ou expirado.');
           }
           const data = await response.json();
           setPhoneNumber(data.phone_number);
-          // Chama a busca de dados passando o número recebido diretamente
-          handleFetchData(data.phone_number);
-          // Limpa o token da URL
+          await handleFetchData(data.phone_number);
           window.history.replaceState({}, document.title, window.location.pathname);
         } catch (err) {
           setError(err.message);
@@ -459,7 +457,6 @@ const App = () => {
     checkToken();
   }, []);
 
-  // Efeito para combinar despesas e receitas num único array
   useEffect(() => {
     if (apiData) {
         const expenses = apiData.expenses.map(e => ({ ...e, type: 'expense' }));
