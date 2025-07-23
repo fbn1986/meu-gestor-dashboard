@@ -577,6 +577,35 @@ const GerenciarCategoriasView = ({ categories, setCategories, phoneNumber }) => 
     );
 };
 
+const AgendaView = ({ reminders, setReminders, phoneNumber }) => {
+    // Implementação futura
+    return (
+        <div className="bg-white p-6 rounded-lg shadow-md">
+            <h2 className="text-xl font-semibold text-gray-800 mb-6">Agenda de Lembretes</h2>
+            <div className="space-y-4">
+                {reminders.length > 0 ? (
+                    reminders.map(reminder => (
+                        <div key={reminder.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                            <div>
+                                <p className="font-semibold text-gray-800">{reminder.description}</p>
+                                <p className="text-sm text-gray-500">
+                                    {new Date(reminder.due_date).toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                </p>
+                            </div>
+                            <div className="flex items-center gap-4">
+                                <button className="text-sm text-blue-600 hover:text-blue-800"><Edit size={16}/></button>
+                                <button className="text-sm text-red-600 hover:text-red-800"><Trash2 size={16}/></button>
+                            </div>
+                        </div>
+                    ))
+                ) : (
+                    <p className="text-center text-gray-500">Nenhum lembrete agendado.</p>
+                )}
+            </div>
+        </div>
+    );
+};
+
 
 // --- Componente Principal ---
 const App = () => {
@@ -584,6 +613,7 @@ const App = () => {
   const [apiData, setApiData] = useState(null);
   const [allTransactions, setAllTransactions] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [reminders, setReminders] = useState([]); // Novo estado para lembretes
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [activeView, setActiveView] = useState('visaoGeral');
@@ -606,6 +636,7 @@ const App = () => {
       if (result.error) throw new Error(result.error);
       setApiData(result);
       setCategories(result.categories || []);
+      setReminders(result.reminders || []); // Armazena os lembretes
     } catch (err) {
       setError(err.message);
     } finally {
@@ -714,6 +745,7 @@ const App = () => {
             {activeView === 'categorias' && <CategoriasView expensesGrouped={processedData.expensesGrouped} />}
             {activeView === 'tabela' && <TabelaTransacoesView transactions={allTransactions} setTransactions={setAllTransactions} phoneNumber={phoneNumber} categories={categories} setCategories={setCategories} />}
             {activeView === 'gerenciarCategorias' && <GerenciarCategoriasView categories={categories} setCategories={setCategories} phoneNumber={phoneNumber} />}
+            {activeView === 'agenda' && <AgendaView reminders={reminders} setReminders={setReminders} phoneNumber={phoneNumber} />}
           </>
         )}
       </div>
