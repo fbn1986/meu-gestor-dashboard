@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Sector } from 'recharts';
-import { Search, Loader, AlertCircle, TrendingUp, TrendingDown, DollarSign, Wallet, LayoutDashboard, List, ChevronDown, ChevronUp, Database, Edit, Trash2, X } from 'lucide-react';
+import { Search, Loader, AlertCircle, TrendingUp, TrendingDown, DollarSign, Wallet, LayoutDashboard, List, ChevronDown, ChevronUp, Database, Edit, Trash2, X, PlusCircle, Tag } from 'lucide-react';
 
 // Cores para o gráfico e cards
 const COLORS = ['#3b82f6', '#10b981', '#f97316', '#ef4444', '#8b5cf6', '#ec4899', '#f59e0b'];
@@ -34,24 +34,30 @@ const Header = ({ onFetch, loading, phoneNumber, setPhoneNumber, activeView, set
           </button>
         </div>
       </div>
-      <nav className="flex space-x-4 sm:space-x-8 -mb-px">
+      <nav className="flex space-x-4 sm:space-x-8 -mb-px overflow-x-auto">
         <button 
           onClick={() => setActiveView('visaoGeral')}
-          className={`py-3 px-1 text-sm font-medium border-b-2 flex items-center gap-2 ${activeView === 'visaoGeral' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
+          className={`py-3 px-1 text-sm font-medium border-b-2 flex items-center gap-2 whitespace-nowrap ${activeView === 'visaoGeral' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
         >
           <LayoutDashboard size={16} /> Visão Geral
         </button>
         <button 
           onClick={() => setActiveView('categorias')}
-          className={`py-3 px-1 text-sm font-medium border-b-2 flex items-center gap-2 ${activeView === 'categorias' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
+          className={`py-3 px-1 text-sm font-medium border-b-2 flex items-center gap-2 whitespace-nowrap ${activeView === 'categorias' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
         >
-          <List size={16} /> Categorias
+          <List size={16} /> Despesas por Categoria
         </button>
         <button 
           onClick={() => setActiveView('tabela')}
-          className={`py-3 px-1 text-sm font-medium border-b-2 flex items-center gap-2 ${activeView === 'tabela' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
+          className={`py-3 px-1 text-sm font-medium border-b-2 flex items-center gap-2 whitespace-nowrap ${activeView === 'tabela' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
         >
-          <Database size={16} /> Tabela
+          <Database size={16} /> Todas as Transações
+        </button>
+        <button 
+          onClick={() => setActiveView('gerenciarCategorias')}
+          className={`py-3 px-1 text-sm font-medium border-b-2 flex items-center gap-2 whitespace-nowrap ${activeView === 'gerenciarCategorias' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
+        >
+          <Tag size={16} /> Minhas Categorias
         </button>
       </nav>
     </div>
@@ -397,12 +403,53 @@ const TabelaTransacoesView = ({ transactions, setTransactions, phoneNumber, cate
     );
 };
 
+// --- NOVO: Componente para Gerenciar Categorias ---
+const GerenciarCategoriasView = ({ categories, setCategories, phoneNumber }) => {
+    // Implementação futura
+    return (
+        <div className="bg-white p-6 rounded-lg shadow-md">
+            <h2 className="text-xl font-semibold text-gray-800 mb-2">Gerenciar Categorias Personalizadas</h2>
+            <p className="text-sm text-gray-600 mb-6">A IA é capaz de identificar categorias automaticamente. No entanto, se preferir, você pode personalizar as categorias de acordo com suas necessidades.</p>
+            
+            <div className="mb-6">
+                 <button className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition flex items-center">
+                    <PlusCircle size={18} className="mr-2"/>
+                    Crie sua categoria
+                </button>
+            </div>
+
+            <div className="space-y-3">
+                {categories.map((cat, index) => (
+                    <div key={cat.id} className="flex justify-between items-center p-3 rounded-md" style={{ backgroundColor: index % 2 === 0 ? '#f9fafb' : '#fff' }}>
+                        <div className="flex items-center">
+                            <span className="w-3 h-3 rounded-full mr-4" style={{ backgroundColor: COLORS[index % COLORS.length] }}></span>
+                            <span className="text-gray-800 font-medium">{cat.name}</span>
+                            {cat.is_default && <span className="text-xs bg-gray-200 text-gray-600 px-2 py-1 rounded-full ml-3">Padrão</span>}
+                        </div>
+                        {!cat.is_default && (
+                             <div className="flex items-center gap-4">
+                                <button className="text-sm text-blue-600 hover:text-blue-800 flex items-center gap-1">
+                                    <Edit size={14}/> Editar
+                                </button>
+                                <button className="text-sm text-red-600 hover:text-red-800 flex items-center gap-1">
+                                    <Trash2 size={14}/> Excluir
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+};
+
 
 // --- Componente Principal ---
 const App = () => {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [apiData, setApiData] = useState(null);
   const [allTransactions, setAllTransactions] = useState([]);
+  const [categories, setCategories] = useState([]); // Novo estado para categorias
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [activeView, setActiveView] = useState('visaoGeral');
@@ -424,6 +471,7 @@ const App = () => {
       const result = await response.json();
       if (result.error) throw new Error(result.error);
       setApiData(result);
+      setCategories(result.categories || []); // Armazena as categorias
     } catch (err) {
       setError(err.message);
     } finally {
@@ -497,10 +545,10 @@ const App = () => {
       })
       .reduce((acc, [key, value]) => ({ ...acc, [key]: value }), {});
       
-    const allCategories = Object.keys(sortedExpensesGrouped);
+    const allCategoryNames = categories.map(c => c.name);
 
-    return { totalIncome, totalExpense, balance, expenseByCategory, expensesGrouped: sortedExpensesGrouped, allCategories };
-  }, [apiData]);
+    return { totalIncome, totalExpense, balance, expenseByCategory, expensesGrouped: sortedExpensesGrouped, allCategoryNames };
+  }, [apiData, categories]);
 
   return (
     <div className="bg-gray-100 min-h-screen font-sans">
@@ -532,7 +580,8 @@ const App = () => {
           <>
             {activeView === 'visaoGeral' && <VisaoGeralView stats={processedData} />}
             {activeView === 'categorias' && <CategoriasView expensesGrouped={processedData.expensesGrouped} />}
-            {activeView === 'tabela' && <TabelaTransacoesView transactions={allTransactions} setTransactions={setAllTransactions} phoneNumber={phoneNumber} categories={processedData.allCategories} />}
+            {activeView === 'tabela' && <TabelaTransacoesView transactions={allTransactions} setTransactions={setAllTransactions} phoneNumber={phoneNumber} categories={processedData.allCategoryNames} />}
+            {activeView === 'gerenciarCategorias' && <GerenciarCategoriasView categories={categories} setCategories={setCategories} phoneNumber={phoneNumber} />}
           </>
         )}
       </div>
