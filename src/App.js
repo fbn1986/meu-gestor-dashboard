@@ -403,16 +403,85 @@ const TabelaTransacoesView = ({ transactions, setTransactions, phoneNumber, cate
     );
 };
 
-// --- NOVO: Componente para Gerenciar Categorias ---
 const GerenciarCategoriasView = ({ categories, setCategories, phoneNumber }) => {
-    // Implementação futura
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [modalMode, setModalMode] = useState('create'); // 'create' or 'edit'
+    const [selectedCategory, setSelectedCategory] = useState(null);
+    const [categoryName, setCategoryName] = useState('');
+    const [error, setError] = useState('');
+    
+    const API_BASE_URL = 'https://meu-gestor-fernando.onrender.com';
+
+    const openModal = (mode, category = null) => {
+        setModalMode(mode);
+        setSelectedCategory(category);
+        setCategoryName(category ? category.name : '');
+        setError('');
+        setIsModalOpen(true);
+    };
+
+    const handleSave = async (e) => {
+        e.preventDefault();
+        if (!categoryName) {
+            setError('O nome da categoria não pode estar vazio.');
+            return;
+        }
+        setError('');
+        const cleanPhoneNumber = phoneNumber.replace(/\D/g, '');
+
+        if (modalMode === 'create') {
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/categories/${cleanPhoneNumber}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name: categoryName }),
+                });
+                if (!response.ok) throw new Error('Falha ao criar categoria.');
+                const newCategory = await response.json();
+                setCategories(prev => [...prev, newCategory].sort((a, b) => a.name.localeCompare(b.name)));
+                setIsModalOpen(false);
+            } catch (err) {
+                setError(err.message);
+            }
+        } else { // edit
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/category/${selectedCategory.id}?phone_number=${cleanPhoneNumber}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name: categoryName }),
+                });
+                if (!response.ok) throw new Error('Falha ao editar categoria.');
+                const updatedCategory = await response.json();
+                setCategories(prev => prev.map(c => c.id === updatedCategory.id ? updatedCategory : c));
+                setIsModalOpen(false);
+            } catch (err) {
+                setError(err.message);
+            }
+        }
+    };
+    
+    const handleDelete = async (category) => {
+        if (window.confirm(`Tem a certeza que quer apagar a categoria "${category.name}"?`)) {
+            const cleanPhoneNumber = phoneNumber.replace(/\D/g, '');
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/category/${category.id}?phone_number=${cleanPhoneNumber}`, {
+                    method: 'DELETE',
+                });
+                if (!response.ok) throw new Error('Falha ao apagar categoria.');
+                setCategories(prev => prev.filter(c => c.id !== category.id));
+            } catch (err) {
+                alert(err.message);
+            }
+        }
+    };
+
     return (
         <div className="bg-white p-6 rounded-lg shadow-md">
             <h2 className="text-xl font-semibold text-gray-800 mb-2">Gerenciar Categorias Personalizadas</h2>
             <p className="text-sm text-gray-600 mb-6">A IA é capaz de identificar categorias automaticamente. No entanto, se preferir, você pode personalizar as categorias de acordo com suas necessidades.</p>
             
             <div className="mb-6">
-                 <button className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition flex items-center">
+                 <button onClick={() => openModal('create')} className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition flex items-center">
                     <PlusCircle size={18} className="mr-2"/>
                     Crie sua categoria
                 </button>
@@ -428,10 +497,10 @@ const GerenciarCategoriasView = ({ categories, setCategories, phoneNumber }) => 
                         </div>
                         {!cat.is_default && (
                              <div className="flex items-center gap-4">
-                                <button className="text-sm text-blue-600 hover:text-blue-800 flex items-center gap-1">
+                                <button onClick={() => openModal('edit', cat)} className="text-sm text-blue-600 hover:text-blue-800 flex items-center gap-1">
                                     <Edit size={14}/> Editar
                                 </button>
-                                <button className="text-sm text-red-600 hover:text-red-800 flex items-center gap-1">
+                                <button onClick={() => handleDelete(cat)} className="text-sm text-red-600 hover:text-red-800 flex items-center gap-1">
                                     <Trash2 size={14}/> Excluir
                                 </button>
                             </div>
@@ -439,6 +508,27 @@ const GerenciarCategoriasView = ({ categories, setCategories, phoneNumber }) => 
                     </div>
                 ))}
             </div>
+
+            <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={modalMode === 'create' ? 'Criar Nova Categoria' : 'Editar Categoria'}>
+                <form onSubmit={handleSave}>
+                    {error && <div className="bg-red-100 text-red-700 p-3 rounded-md mb-4 text-sm">{error}</div>}
+                    <div className="mb-4">
+                        <label htmlFor="categoryName" className="block text-sm font-medium text-gray-700 mb-1">Nome da Categoria</label>
+                        <input 
+                            type="text" 
+                            id="categoryName"
+                            value={categoryName}
+                            onChange={(e) => setCategoryName(e.target.value)}
+                            className="p-2 border rounded-md w-full" 
+                            required 
+                        />
+                    </div>
+                    <div className="flex justify-end gap-3 mt-6">
+                        <button type="button" onClick={() => setIsModalOpen(false)} className="bg-gray-200 text-gray-800 px-4 py-2 rounded-md hover:bg-gray-300">Cancelar</button>
+                        <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">Salvar</button>
+                    </div>
+                </form>
+            </Modal>
         </div>
     );
 };
@@ -449,7 +539,7 @@ const App = () => {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [apiData, setApiData] = useState(null);
   const [allTransactions, setAllTransactions] = useState([]);
-  const [categories, setCategories] = useState([]); // Novo estado para categorias
+  const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [activeView, setActiveView] = useState('visaoGeral');
@@ -471,7 +561,7 @@ const App = () => {
       const result = await response.json();
       if (result.error) throw new Error(result.error);
       setApiData(result);
-      setCategories(result.categories || []); // Armazena as categorias
+      setCategories(result.categories || []);
     } catch (err) {
       setError(err.message);
     } finally {
