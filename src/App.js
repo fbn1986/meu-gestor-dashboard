@@ -201,7 +201,7 @@ const Modal = ({ isOpen, onClose, title, children }) => {
     );
 };
 
-const TabelaTransacoesView = ({ transactions, setTransactions, phoneNumber, categories }) => {
+const TabelaTransacoesView = ({ transactions, setTransactions, phoneNumber, categories, setCategories }) => {
     const [filterText, setFilterText] = useState('');
     const [filterCategory, setFilterCategory] = useState('all');
     const [startDate, setStartDate] = useState('');
@@ -211,6 +211,7 @@ const TabelaTransacoesView = ({ transactions, setTransactions, phoneNumber, cate
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [selectedTransaction, setSelectedTransaction] = useState(null);
     const [modalError, setModalError] = useState(null);
+    const [showNewCategoryInput, setShowNewCategoryInput] = useState(false);
     
     const API_BASE_URL = 'https://meu-gestor-fernando.onrender.com';
 
@@ -236,6 +237,7 @@ const TabelaTransacoesView = ({ transactions, setTransactions, phoneNumber, cate
     const handleEdit = (transaction) => {
         setModalError(null);
         setSelectedTransaction(transaction);
+        setShowNewCategoryInput(false);
         setIsEditModalOpen(true);
     };
 
@@ -276,15 +278,36 @@ const TabelaTransacoesView = ({ transactions, setTransactions, phoneNumber, cate
 
         const { id, type } = selectedTransaction;
         const cleanPhoneNumber = phoneNumber.replace(/\D/g, '');
+        const form = e.target;
+
+        let finalCategory = form.elements.category.value;
+        // Se uma nova categoria foi criada, primeiro crie-a
+        if (showNewCategoryInput && form.elements.newCategory.value) {
+            const newCategoryName = form.elements.newCategory.value;
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/categories/${cleanPhoneNumber}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name: newCategoryName }),
+                });
+                if (!response.ok) throw new Error('Falha ao criar nova categoria.');
+                const newCategory = await response.json();
+                setCategories(prev => [...prev, newCategory]);
+                finalCategory = newCategory.name;
+            } catch (err) {
+                setModalError(err.message);
+                return;
+            }
+        }
+
         const endpoint = type === 'expense' 
             ? `/api/expense/${id}?phone_number=${cleanPhoneNumber}` 
             : `/api/income/${id}?phone_number=${cleanPhoneNumber}`;
         
-        const form = e.target;
         const updatedData = {
             description: form.elements.description.value,
             value: parseFloat(form.elements.value.value),
-            ...(type === 'expense' && { category: form.elements.category.value })
+            ...(type === 'expense' && { category: finalCategory })
         };
 
         try {
@@ -325,7 +348,7 @@ const TabelaTransacoesView = ({ transactions, setTransactions, phoneNumber, cate
                 <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="p-2 border rounded-md" />
                 <select value={filterCategory} onChange={e => setFilterCategory(e.target.value)} className="p-2 border rounded-md">
                     <option value="all">Todas as Categorias</option>
-                    {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                    {categories.map(cat => <option key={cat.id} value={cat.name}>{cat.name}</option>)}
                 </select>
                 <input type="text" value={filterText} onChange={e => setFilterText(e.target.value)} placeholder="Pesquisar descrição..." className="p-2 border rounded-md" />
             </div>
@@ -376,7 +399,23 @@ const TabelaTransacoesView = ({ transactions, setTransactions, phoneNumber, cate
                         {selectedTransaction.type === 'expense' && (
                             <div className="mb-6">
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Categoria</label>
-                                <input type="text" name="category" defaultValue={selectedTransaction.category} className="p-2 border rounded-md w-full" />
+                                <select 
+                                    name="category" 
+                                    defaultValue={selectedTransaction.category || 'Outros'}
+                                    onChange={(e) => setShowNewCategoryInput(e.target.value === 'new')}
+                                    className="p-2 border rounded-md w-full"
+                                >
+                                    {categories.map(cat => <option key={cat.id} value={cat.name}>{cat.name}</option>)}
+                                    <option value="new">-- Criar Nova Categoria --</option>
+                                </select>
+                                {showNewCategoryInput && (
+                                    <input 
+                                        type="text" 
+                                        name="newCategory" 
+                                        placeholder="Nome da nova categoria"
+                                        className="p-2 border rounded-md w-full mt-2"
+                                    />
+                                )}
                             </div>
                         )}
                         <div className="flex justify-end gap-3 mt-6">
@@ -635,10 +674,8 @@ const App = () => {
       })
       .reduce((acc, [key, value]) => ({ ...acc, [key]: value }), {});
       
-    const allCategoryNames = categories.map(c => c.name);
-
-    return { totalIncome, totalExpense, balance, expenseByCategory, expensesGrouped: sortedExpensesGrouped, allCategoryNames };
-  }, [apiData, categories]);
+    return { totalIncome, totalExpense, balance, expenseByCategory, expensesGrouped: sortedExpensesGrouped };
+  }, [apiData]);
 
   return (
     <div className="bg-gray-100 min-h-screen font-sans">
@@ -670,7 +707,7 @@ const App = () => {
           <>
             {activeView === 'visaoGeral' && <VisaoGeralView stats={processedData} />}
             {activeView === 'categorias' && <CategoriasView expensesGrouped={processedData.expensesGrouped} />}
-            {activeView === 'tabela' && <TabelaTransacoesView transactions={allTransactions} setTransactions={setAllTransactions} phoneNumber={phoneNumber} categories={processedData.allCategoryNames} />}
+            {activeView === 'tabela' && <TabelaTransacoesView transactions={allTransactions} setTransactions={setAllTransactions} phoneNumber={phoneNumber} categories={categories} setCategories={setCategories} />}
             {activeView === 'gerenciarCategorias' && <GerenciarCategoriasView categories={categories} setCategories={setCategories} phoneNumber={phoneNumber} />}
           </>
         )}
