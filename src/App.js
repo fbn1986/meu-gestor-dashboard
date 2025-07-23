@@ -541,13 +541,13 @@ const GerenciarCategoriasView = ({ categories, setCategories, phoneNumber }) => 
                         </div>
                         {!cat.is_default && (
                              <div className="flex items-center gap-4">
-                                <button onClick={() => openModal('edit', cat)} className="text-sm text-blue-600 hover:text-blue-800 flex items-center gap-1">
-                                    <Edit size={14}/> Editar
-                                </button>
-                                <button onClick={() => handleDelete(cat)} className="text-sm text-red-600 hover:text-red-800 flex items-center gap-1">
-                                    <Trash2 size={14}/> Excluir
-                                </button>
-                            </div>
+                                 <button onClick={() => openModal('edit', cat)} className="text-sm text-blue-600 hover:text-blue-800 flex items-center gap-1">
+                                     <Edit size={14}/> Editar
+                                 </button>
+                                 <button onClick={() => handleDelete(cat)} className="text-sm text-red-600 hover:text-red-800 flex items-center gap-1">
+                                     <Trash2 size={14}/> Excluir
+                                 </button>
+                             </div>
                         )}
                     </div>
                 ))}
@@ -578,7 +578,92 @@ const GerenciarCategoriasView = ({ categories, setCategories, phoneNumber }) => 
 };
 
 const AgendaView = ({ reminders, setReminders, phoneNumber }) => {
-    // Implementação futura
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+    const [selectedReminder, setSelectedReminder] = useState(null);
+    const [modalError, setModalError] = useState(null);
+    
+    const API_BASE_URL = 'https://meu-gestor-fernando.onrender.com';
+
+    // Função para formatar a data ISO para o input datetime-local
+    const formatToLocalDateTime = (isoString) => {
+        if (!isoString) return '';
+        const date = new Date(isoString);
+        // Subtrai o offset do fuso horário para exibir a hora local corretamente
+        date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
+        return date.toISOString().slice(0, 16);
+    };
+
+    const handleEdit = (reminder) => {
+        setModalError(null);
+        setSelectedReminder(reminder);
+        setIsEditModalOpen(true);
+    };
+
+    const handleDelete = (reminder) => {
+        setModalError(null);
+        setSelectedReminder(reminder);
+        setIsDeleteModalOpen(true);
+    };
+
+    const confirmDelete = async () => {
+        if (!selectedReminder) return;
+        setModalError(null);
+        const cleanPhoneNumber = phoneNumber.replace(/\D/g, '');
+        
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/reminder/${selectedReminder.id}?phone_number=${cleanPhoneNumber}`, {
+                method: 'DELETE',
+            });
+            if (!response.ok) {
+                const errData = await response.json();
+                throw new Error(errData.detail || 'Falha ao apagar o lembrete.');
+            }
+            
+            setReminders(prev => prev.filter(r => r.id !== selectedReminder.id));
+            setIsDeleteModalOpen(false);
+            setSelectedReminder(null);
+        } catch (err) {
+            setModalError(err.message);
+        }
+    };
+    
+    const handleUpdate = async (e) => {
+        e.preventDefault();
+        if (!selectedReminder) return;
+        setModalError(null);
+        
+        const cleanPhoneNumber = phoneNumber.replace(/\D/g, '');
+        const form = e.target;
+        
+        // O valor do input 'datetime-local' já é a hora local do usuário
+        const localDateTime = new Date(form.elements.due_date.value);
+        
+        const updatedData = {
+            description: form.elements.description.value,
+            due_date: localDateTime.toISOString(), // Envia em formato ISO (UTC)
+        };
+
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/reminder/${selectedReminder.id}?phone_number=${cleanPhoneNumber}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(updatedData),
+            });
+            if (!response.ok) {
+                const errData = await response.json();
+                throw new Error(errData.detail || 'Falha ao atualizar o lembrete.');
+            }
+            const result = await response.json();
+            
+            setReminders(prev => prev.map(r => (r.id === result.id ? result : r)));
+            setIsEditModalOpen(false);
+            setSelectedReminder(null);
+        } catch (err) {
+            setModalError(err.message);
+        }
+    };
+
     return (
         <div className="bg-white p-6 rounded-lg shadow-md">
             <h2 className="text-xl font-semibold text-gray-800 mb-6">Agenda de Lembretes</h2>
@@ -593,8 +678,8 @@ const AgendaView = ({ reminders, setReminders, phoneNumber }) => {
                                 </p>
                             </div>
                             <div className="flex items-center gap-4">
-                                <button className="text-sm text-blue-600 hover:text-blue-800"><Edit size={16}/></button>
-                                <button className="text-sm text-red-600 hover:text-red-800"><Trash2 size={16}/></button>
+                                <button onClick={() => handleEdit(reminder)} className="text-sm text-blue-600 hover:text-blue-800"><Edit size={16}/></button>
+                                <button onClick={() => handleDelete(reminder)} className="text-sm text-red-600 hover:text-red-800"><Trash2 size={16}/></button>
                             </div>
                         </div>
                     ))
@@ -602,6 +687,39 @@ const AgendaView = ({ reminders, setReminders, phoneNumber }) => {
                     <p className="text-center text-gray-500">Nenhum lembrete agendado.</p>
                 )}
             </div>
+
+            <Modal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} title="Editar Lembrete">
+                {selectedReminder && (
+                    <form onSubmit={handleUpdate}>
+                        {modalError && <div className="bg-red-100 text-red-700 p-3 rounded-md mb-4 text-sm">{modalError}</div>}
+                        <div className="mb-4">
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Descrição</label>
+                            <input type="text" name="description" defaultValue={selectedReminder.description} className="p-2 border rounded-md w-full" required />
+                        </div>
+                        <div className="mb-4">
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Data e Hora</label>
+                            <input type="datetime-local" name="due_date" defaultValue={formatToLocalDateTime(selectedReminder.due_date)} className="p-2 border rounded-md w-full" required />
+                        </div>
+                        <div className="flex justify-end gap-3 mt-6">
+                            <button type="button" onClick={() => setIsEditModalOpen(false)} className="bg-gray-200 text-gray-800 px-4 py-2 rounded-md hover:bg-gray-300">Cancelar</button>
+                            <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">Salvar</button>
+                        </div>
+                    </form>
+                )}
+            </Modal>
+
+            <Modal isOpen={isDeleteModalOpen} onClose={() => setIsDeleteModalOpen(false)} title="Confirmar Exclusão">
+                {selectedReminder && (
+                    <div>
+                        {modalError && <div className="bg-red-100 text-red-700 p-3 rounded-md mb-4 text-sm">{modalError}</div>}
+                        <p className="text-gray-700 mb-6">Tem a certeza que deseja apagar o lembrete: "{selectedReminder.description}"?</p>
+                        <div className="flex justify-end gap-3">
+                            <button type="button" onClick={() => setIsDeleteModalOpen(false)} className="bg-gray-200 text-gray-800 px-4 py-2 rounded-md hover:bg-gray-300">Cancelar</button>
+                            <button type="button" onClick={confirmDelete} className="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700">Apagar</button>
+                        </div>
+                    </div>
+                )}
+            </Modal>
         </div>
     );
 };
