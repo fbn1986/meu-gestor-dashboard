@@ -613,7 +613,7 @@ const App = () => {
   const [apiData, setApiData] = useState(null);
   const [allTransactions, setAllTransactions] = useState([]);
   const [categories, setCategories] = useState([]);
-  const [reminders, setReminders] = useState([]); // Novo estado para lembretes
+  const [reminders, setReminders] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [activeView, setActiveView] = useState('visaoGeral');
@@ -636,7 +636,7 @@ const App = () => {
       if (result.error) throw new Error(result.error);
       setApiData(result);
       setCategories(result.categories || []);
-      setReminders(result.reminders || []); // Armazena os lembretes
+      setReminders(result.reminders || []);
     } catch (err) {
       setError(err.message);
     } finally {
