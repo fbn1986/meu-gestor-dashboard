@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Sector } from 'recharts';
-import { Search, Loader, AlertCircle, TrendingUp, TrendingDown, DollarSign, Wallet, LayoutDashboard, List, ChevronDown, ChevronUp, Database, Edit, Trash2, X, PlusCircle, Tag } from 'lucide-react';
+import { Search, Loader, AlertCircle, TrendingUp, TrendingDown, DollarSign, Wallet, LayoutDashboard, List, ChevronDown, ChevronUp, Database, Edit, Trash2, X, PlusCircle, Tag, Calendar } from 'lucide-react';
 
 // Cores para o gráfico e cards
 const COLORS = ['#3b82f6', '#10b981', '#f97316', '#ef4444', '#8b5cf6', '#ec4899', '#f59e0b'];
@@ -58,6 +58,12 @@ const Header = ({ onFetch, loading, phoneNumber, setPhoneNumber, activeView, set
           className={`py-3 px-1 text-sm font-medium border-b-2 flex items-center gap-2 whitespace-nowrap ${activeView === 'gerenciarCategorias' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
         >
           <Tag size={16} /> Minhas Categorias
+        </button>
+        <button 
+          onClick={() => setActiveView('agenda')}
+          className={`py-3 px-1 text-sm font-medium border-b-2 flex items-center gap-2 whitespace-nowrap ${activeView === 'agenda' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
+        >
+          <Calendar size={16} /> Agenda
         </button>
       </nav>
     </div>
@@ -281,7 +287,6 @@ const TabelaTransacoesView = ({ transactions, setTransactions, phoneNumber, cate
         const form = e.target;
 
         let finalCategory = form.elements.category.value;
-        // Se uma nova categoria foi criada, primeiro crie-a
         if (showNewCategoryInput && form.elements.newCategory.value) {
             const newCategoryName = form.elements.newCategory.value;
             try {
