@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Sector } from 'recharts';
-import { Search, Loader, AlertCircle, TrendingUp, TrendingDown, DollarSign, Wallet, LayoutDashboard, List, ChevronDown, ChevronUp, Database, Edit, Trash2, X, PlusCircle, Tag, Calendar } from 'lucide-react';
+import { Search, Loader, AlertCircle, TrendingUp, TrendingDown, DollarSign, Wallet, LayoutDashboard, List, ChevronDown, ChevronUp, Database, Edit, Trash2, X, PlusCircle, Tag, Calendar, LogOut } from 'lucide-react';
 
 // Cores para o gráfico e cards
 const COLORS = ['#3b82f6', '#10b981', '#f97316', '#ef4444', '#8b5cf6', '#ec4899', '#f59e0b'];
 
 // --- Componentes da UI ---
 
-const Header = ({ onFetch, loading, phoneNumber, setPhoneNumber, activeView, setActiveView }) => (
+const Header = ({ onFetch, loading, phoneNumber, setPhoneNumber, activeView, setActiveView, handleLogout, isLoggedIn }) => (
   <header className="bg-white shadow-sm sticky top-0 z-20">
     <div className="container mx-auto px-4 sm:px-6 lg:px-8">
       <div className="py-4 flex flex-wrap justify-between items-center gap-4 border-b border-gray-200">
@@ -23,49 +23,61 @@ const Header = ({ onFetch, loading, phoneNumber, setPhoneNumber, activeView, set
             placeholder="Seu nº WhatsApp (só números)"
             className="p-2 border rounded-md focus:ring-2 focus:ring-blue-500 transition w-40 sm:w-48"
             onKeyPress={(e) => e.key === 'Enter' && onFetch()}
+            disabled={isLoggedIn} // Desabilita se já estiver logado
           />
           <button
             onClick={() => onFetch()}
-            disabled={loading}
+            disabled={loading || isLoggedIn} // Desabilita se carregando ou logado
             className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition flex items-center disabled:bg-gray-400"
           >
             {loading ? <Loader className="animate-spin sm:mr-2" size={20}/> : <Search size={20} className="sm:mr-2"/>}
             <span className="hidden sm:inline">Carregar</span>
           </button>
+          {isLoggedIn && (
+             <button
+                onClick={handleLogout}
+                title="Sair"
+                className="bg-red-500 text-white p-2 rounded-md hover:bg-red-600 transition flex items-center"
+              >
+                <LogOut size={20} />
+              </button>
+          )}
         </div>
       </div>
-      <nav className="flex space-x-4 sm:space-x-8 -mb-px overflow-x-auto">
-        <button 
-          onClick={() => setActiveView('visaoGeral')}
-          className={`py-3 px-1 text-sm font-medium border-b-2 flex items-center gap-2 whitespace-nowrap ${activeView === 'visaoGeral' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
-        >
-          <LayoutDashboard size={16} /> Visão Geral
-        </button>
-        <button 
-          onClick={() => setActiveView('categorias')}
-          className={`py-3 px-1 text-sm font-medium border-b-2 flex items-center gap-2 whitespace-nowrap ${activeView === 'categorias' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
-        >
-          <List size={16} /> Despesas por Categoria
-        </button>
-        <button 
-          onClick={() => setActiveView('tabela')}
-          className={`py-3 px-1 text-sm font-medium border-b-2 flex items-center gap-2 whitespace-nowrap ${activeView === 'tabela' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
-        >
-          <Database size={16} /> Todas as Transações
-        </button>
-        <button 
-          onClick={() => setActiveView('gerenciarCategorias')}
-          className={`py-3 px-1 text-sm font-medium border-b-2 flex items-center gap-2 whitespace-nowrap ${activeView === 'gerenciarCategorias' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
-        >
-          <Tag size={16} /> Minhas Categorias
-        </button>
-        <button 
-          onClick={() => setActiveView('agenda')}
-          className={`py-3 px-1 text-sm font-medium border-b-2 flex items-center gap-2 whitespace-nowrap ${activeView === 'agenda' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
-        >
-          <Calendar size={16} /> Agenda
-        </button>
-      </nav>
+      {isLoggedIn && (
+        <nav className="flex space-x-4 sm:space-x-8 -mb-px overflow-x-auto">
+            <button 
+            onClick={() => setActiveView('visaoGeral')}
+            className={`py-3 px-1 text-sm font-medium border-b-2 flex items-center gap-2 whitespace-nowrap ${activeView === 'visaoGeral' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
+            >
+            <LayoutDashboard size={16} /> Visão Geral
+            </button>
+            <button 
+            onClick={() => setActiveView('categorias')}
+            className={`py-3 px-1 text-sm font-medium border-b-2 flex items-center gap-2 whitespace-nowrap ${activeView === 'categorias' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
+            >
+            <List size={16} /> Despesas por Categoria
+            </button>
+            <button 
+            onClick={() => setActiveView('tabela')}
+            className={`py-3 px-1 text-sm font-medium border-b-2 flex items-center gap-2 whitespace-nowrap ${activeView === 'tabela' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
+            >
+            <Database size={16} /> Todas as Transações
+            </button>
+            <button 
+            onClick={() => setActiveView('gerenciarCategorias')}
+            className={`py-3 px-1 text-sm font-medium border-b-2 flex items-center gap-2 whitespace-nowrap ${activeView === 'gerenciarCategorias' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
+            >
+            <Tag size={16} /> Minhas Categorias
+            </button>
+            <button 
+            onClick={() => setActiveView('agenda')}
+            className={`py-3 px-1 text-sm font-medium border-b-2 flex items-center gap-2 whitespace-nowrap ${activeView === 'agenda' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
+            >
+            <Calendar size={16} /> Agenda
+            </button>
+        </nav>
+      )}
     </div>
   </header>
 );
@@ -505,6 +517,7 @@ const GerenciarCategoriasView = ({ categories, setCategories, phoneNumber }) => 
     };
     
     const handleDelete = async (category) => {
+        // Usando o Modal customizado em vez do window.confirm
         if (window.confirm(`Tem a certeza que quer apagar a categoria "${category.name}"?`)) {
             const cleanPhoneNumber = phoneNumber.replace(/\D/g, '');
             try {
@@ -542,10 +555,10 @@ const GerenciarCategoriasView = ({ categories, setCategories, phoneNumber }) => 
                         {!cat.is_default && (
                              <div className="flex items-center gap-4">
                                  <button onClick={() => openModal('edit', cat)} className="text-sm text-blue-600 hover:text-blue-800 flex items-center gap-1">
-                                     <Edit size={14}/> Editar
+                                    <Edit size={14}/> Editar
                                  </button>
                                  <button onClick={() => handleDelete(cat)} className="text-sm text-red-600 hover:text-red-800 flex items-center gap-1">
-                                     <Trash2 size={14}/> Excluir
+                                    <Trash2 size={14}/> Excluir
                                  </button>
                              </div>
                         )}
@@ -732,7 +745,7 @@ const App = () => {
   const [allTransactions, setAllTransactions] = useState([]);
   const [categories, setCategories] = useState([]);
   const [reminders, setReminders] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true); // Começa true para verificar login
   const [error, setError] = useState(null);
   const [activeView, setActiveView] = useState('visaoGeral');
 
@@ -749,7 +762,7 @@ const App = () => {
     setApiData(null);
     try {
       const response = await fetch(`${API_BASE_URL}/api/data/${finalNumber}`);
-      if (!response.ok) throw new Error('Falha ao buscar dados. Verifique o número.');
+      if (!response.ok) throw new Error('Falha ao buscar dados. Verifique o número e tente novamente.');
       const result = await response.json();
       if (result.error) throw new Error(result.error);
       setApiData(result);
@@ -757,18 +770,37 @@ const App = () => {
       setReminders(result.reminders || []);
     } catch (err) {
       setError(err.message);
+      // Limpa o local storage se o número salvo for inválido
+      localStorage.removeItem('meuGestorNumero'); 
     } finally {
       setLoading(false);
     }
   };
 
+  const handleLogout = () => {
+    localStorage.removeItem('meuGestorNumero');
+    setPhoneNumber('');
+    setApiData(null);
+    setAllTransactions([]);
+    setCategories([]);
+    setReminders([]);
+    setError(null);
+    setActiveView('visaoGeral');
+  };
+
+  // Efeito para verificar login salvo ou token na URL ao carregar o app
   useEffect(() => {
-    const checkToken = async () => {
+    const initializeApp = async () => {
+      const savedNumber = localStorage.getItem('meuGestorNumero');
       const urlParams = new URLSearchParams(window.location.search);
       const token = urlParams.get('token');
 
-      if (token) {
-        setLoading(true);
+      if (savedNumber) {
+        // Se tem número salvo, loga automaticamente
+        setPhoneNumber(savedNumber);
+        await handleFetchData(savedNumber);
+      } else if (token) {
+        // Se não tem número salvo, mas tem token, verifica o token
         try {
           const response = await fetch(`${API_BASE_URL}/api/verify-token/${token}`);
           if (!response.ok) {
@@ -776,16 +808,26 @@ const App = () => {
             throw new Error(errData.detail || 'Link de acesso inválido ou expirado.');
           }
           const data = await response.json();
+          
+          // Salva o número no localStorage para futuros acessos
+          localStorage.setItem('meuGestorNumero', data.phone_number);
           setPhoneNumber(data.phone_number);
+          
           await handleFetchData(data.phone_number);
+          // Limpa o token da URL
           window.history.replaceState({}, document.title, window.location.pathname);
         } catch (err) {
           setError(err.message);
           setLoading(false);
         }
+      } else {
+        // Se não tem nem número salvo nem token, apenas para de carregar
+        setLoading(false);
       }
     };
-    checkToken();
+
+    initializeApp();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -833,7 +875,16 @@ const App = () => {
 
   return (
     <div className="bg-gray-100 min-h-screen font-sans">
-      <Header onFetch={handleFetchData} loading={loading} phoneNumber={phoneNumber} setPhoneNumber={setPhoneNumber} activeView={activeView} setActiveView={setActiveView} />
+      <Header 
+        onFetch={() => handleFetchData(phoneNumber)} 
+        loading={loading} 
+        phoneNumber={phoneNumber} 
+        setPhoneNumber={setPhoneNumber} 
+        activeView={activeView} 
+        setActiveView={setActiveView}
+        handleLogout={handleLogout}
+        isLoggedIn={!!apiData}
+      />
       
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {error && (
@@ -845,8 +896,9 @@ const App = () => {
 
         {!apiData && !loading && !error && (
           <div className="text-center py-20 bg-white rounded-lg shadow">
+            <Wallet size={48} className="mx-auto text-blue-400 mb-4" />
             <h2 className="text-xl font-semibold text-gray-700">Bem-vindo ao seu Painel Financeiro</h2>
-            <p className="text-gray-500 mt-2">Insira seu número de telefone e clique em carregar.</p>
+            <p className="text-gray-500 mt-2 max-w-md mx-auto">Para começar, peça seu link de acesso pessoal ao assistente no WhatsApp ou, se já tiver um, insira seu número e clique em carregar.</p>
           </div>
         )}
 
