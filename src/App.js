@@ -1,6 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Sector } from 'recharts';
-import { Search, Loader, AlertCircle, TrendingUp, TrendingDown, DollarSign, Wallet, LayoutDashboard, List, ChevronDown, ChevronUp, Database, Edit, Trash2, X, PlusCircle, Tag, Calendar, LogOut } from 'lucide-react';
+import { 
+    Search, Loader, AlertCircle, TrendingUp, TrendingDown, DollarSign, Wallet, 
+    LayoutDashboard, List, ChevronDown, ChevronUp, Database, Edit, Trash2, X, 
+    PlusCircle, Tag, Calendar, LogOut, MoreVertical, ArrowLeft, ArrowRight,
+    ClipboardList // Novo ícone para Planejamento
+} from 'lucide-react';
 
 // Cores para o gráfico e cards
 const COLORS = ['#3b82f6', '#10b981', '#f97316', '#ef4444', '#8b5cf6', '#ec4899', '#f59e0b'];
@@ -38,9 +43,9 @@ const Header = ({ onFetch, loading, phoneNumber, setPhoneNumber, activeView, set
                 onClick={handleLogout}
                 title="Sair"
                 className="bg-red-500 text-white p-2 rounded-md hover:bg-red-600 transition flex items-center"
-              >
-                <LogOut size={20} />
-              </button>
+             >
+               <LogOut size={20} />
+             </button>
           )}
         </div>
       </div>
@@ -51,6 +56,13 @@ const Header = ({ onFetch, loading, phoneNumber, setPhoneNumber, activeView, set
             className={`py-3 px-1 text-sm font-medium border-b-2 flex items-center gap-2 whitespace-nowrap ${activeView === 'visaoGeral' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
             >
             <LayoutDashboard size={16} /> Visão Geral
+            </button>
+            {/* NOVO BOTÃO DE NAVEGAÇÃO PARA PLANEJAMENTO */}
+            <button 
+            onClick={() => setActiveView('planejamento')}
+            className={`py-3 px-1 text-sm font-medium border-b-2 flex items-center gap-2 whitespace-nowrap ${activeView === 'planejamento' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
+            >
+            <ClipboardList size={16} /> Planejamento
             </button>
             <button 
             onClick={() => setActiveView('categorias')}
@@ -219,521 +231,825 @@ const Modal = ({ isOpen, onClose, title, children }) => {
     );
 };
 
+// ... (Componente TabelaTransacoesView permanece o mesmo)
 const TabelaTransacoesView = ({ transactions, setTransactions, phoneNumber, categories, setCategories }) => {
-    const [filterText, setFilterText] = useState('');
-    const [filterCategory, setFilterCategory] = useState('all');
-    const [startDate, setStartDate] = useState('');
-    const [endDate, setEndDate] = useState('');
-    
-    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-    const [selectedTransaction, setSelectedTransaction] = useState(null);
-    const [modalError, setModalError] = useState(null);
-    const [showNewCategoryInput, setShowNewCategoryInput] = useState(false);
-    
-    const API_BASE_URL = 'https://meu-gestor-fernando.onrender.com';
+  const [filterText, setFilterText] = useState('');
+  const [filterCategory, setFilterCategory] = useState('all');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [selectedTransaction, setSelectedTransaction] = useState(null);
+  const [modalError, setModalError] = useState(null);
+  const [showNewCategoryInput, setShowNewCategoryInput] = useState(false);
+  
+  const API_BASE_URL = 'https://meu-gestor-fernando.onrender.com';
 
-    const filteredTransactions = useMemo(() => {
-        return transactions.filter(t => {
-            const transactionDate = new Date(t.date);
-            const start = startDate ? new Date(startDate) : null;
-            const end = endDate ? new Date(endDate) : null;
+  const filteredTransactions = useMemo(() => {
+      return transactions.filter(t => {
+          const transactionDate = new Date(t.date);
+          const start = startDate ? new Date(startDate) : null;
+          const end = endDate ? new Date(endDate) : null;
 
-            if (start && transactionDate < start) return false;
-            if (end) {
-                const endOfDay = new Date(end);
-                endOfDay.setHours(23, 59, 59, 999);
-                if (transactionDate > endOfDay) return false;
-            }
-            if (filterCategory !== 'all' && (t.category || 'Outros') !== filterCategory) return false;
-            if (filterText && !t.description.toLowerCase().includes(filterText.toLowerCase())) return false;
-            
-            return true;
-        });
-    }, [transactions, filterCategory, filterText, startDate, endDate]);
+          if (start && transactionDate < start) return false;
+          if (end) {
+              const endOfDay = new Date(end);
+              endOfDay.setHours(23, 59, 59, 999);
+              if (transactionDate > endOfDay) return false;
+          }
+          if (filterCategory !== 'all' && (t.category || 'Outros') !== filterCategory) return false;
+          if (filterText && !t.description.toLowerCase().includes(filterText.toLowerCase())) return false;
+          
+          return true;
+      });
+  }, [transactions, filterCategory, filterText, startDate, endDate]);
 
-    const handleEdit = (transaction) => {
-        setModalError(null);
-        setSelectedTransaction(transaction);
-        setShowNewCategoryInput(false);
-        setIsEditModalOpen(true);
-    };
+  const handleEdit = (transaction) => {
+      setModalError(null);
+      setSelectedTransaction(transaction);
+      setShowNewCategoryInput(false);
+      setIsEditModalOpen(true);
+  };
 
-    const handleDelete = (transaction) => {
-        setModalError(null);
-        setSelectedTransaction(transaction);
-        setIsDeleteModalOpen(true);
-    };
+  const handleDelete = (transaction) => {
+      setModalError(null);
+      setSelectedTransaction(transaction);
+      setIsDeleteModalOpen(true);
+  };
 
-    const confirmDelete = async () => {
-        if (!selectedTransaction) return;
-        setModalError(null);
-        const { id, type } = selectedTransaction;
-        const cleanPhoneNumber = phoneNumber.replace(/\D/g, '');
-        const endpoint = type === 'expense' 
-            ? `/api/expense/${id}?phone_number=${cleanPhoneNumber}` 
-            : `/api/income/${id}?phone_number=${cleanPhoneNumber}`;
-        
-        try {
-            const response = await fetch(`${API_BASE_URL}${endpoint}`, { method: 'DELETE' });
-            if (!response.ok) {
-                const errData = await response.json();
-                throw new Error(errData.detail || 'Falha ao apagar.');
-            }
-            
-            setTransactions(prev => prev.filter(t => !(t.id === id && t.type === type)));
-            setIsDeleteModalOpen(false);
-            setSelectedTransaction(null);
-        } catch (err) {
-            setModalError(err.message);
-        }
-    };
+  const confirmDelete = async () => {
+      if (!selectedTransaction) return;
+      setModalError(null);
+      const { id, type } = selectedTransaction;
+      const cleanPhoneNumber = phoneNumber.replace(/\D/g, '');
+      const endpoint = type === 'expense' 
+          ? `/api/expense/${id}?phone_number=${cleanPhoneNumber}` 
+          : `/api/income/${id}?phone_number=${cleanPhoneNumber}`;
+      
+      try {
+          const response = await fetch(`${API_BASE_URL}${endpoint}`, { method: 'DELETE' });
+          if (!response.ok) {
+              const errData = await response.json();
+              throw new Error(errData.detail || 'Falha ao apagar.');
+          }
+          
+          setTransactions(prev => prev.filter(t => !(t.id === id && t.type === type)));
+          setIsDeleteModalOpen(false);
+          setSelectedTransaction(null);
+      } catch (err) {
+          setModalError(err.message);
+      }
+  };
 
-    const handleUpdate = async (e) => {
-        e.preventDefault();
-        if (!selectedTransaction) return;
-        setModalError(null);
+  const handleUpdate = async (e) => {
+      e.preventDefault();
+      if (!selectedTransaction) return;
+      setModalError(null);
 
-        const { id, type } = selectedTransaction;
-        const cleanPhoneNumber = phoneNumber.replace(/\D/g, '');
-        const form = e.target;
+      const { id, type } = selectedTransaction;
+      const cleanPhoneNumber = phoneNumber.replace(/\D/g, '');
+      const form = e.target;
 
-        let finalCategory = form.elements.category.value;
-        if (showNewCategoryInput && form.elements.newCategory.value) {
-            const newCategoryName = form.elements.newCategory.value;
-            try {
-                const response = await fetch(`${API_BASE_URL}/api/categories/${cleanPhoneNumber}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ name: newCategoryName }),
-                });
-                if (!response.ok) throw new Error('Falha ao criar nova categoria.');
-                const newCategory = await response.json();
-                setCategories(prev => [...prev, newCategory]);
-                finalCategory = newCategory.name;
-            } catch (err) {
-                setModalError(err.message);
-                return;
-            }
-        }
+      let finalCategory = form.elements.category.value;
+      if (showNewCategoryInput && form.elements.newCategory.value) {
+          const newCategoryName = form.elements.newCategory.value;
+          try {
+              const response = await fetch(`${API_BASE_URL}/api/categories/${cleanPhoneNumber}`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ name: newCategoryName }),
+              });
+              if (!response.ok) throw new Error('Falha ao criar nova categoria.');
+              const newCategory = await response.json();
+              setCategories(prev => [...prev, newCategory]);
+              finalCategory = newCategory.name;
+          } catch (err) {
+              setModalError(err.message);
+              return;
+          }
+      }
 
-        const endpoint = type === 'expense' 
-            ? `/api/expense/${id}?phone_number=${cleanPhoneNumber}` 
-            : `/api/income/${id}?phone_number=${cleanPhoneNumber}`;
-        
-        const updatedData = {
-            description: form.elements.description.value,
-            value: parseFloat(form.elements.value.value),
-            ...(type === 'expense' && { category: finalCategory })
-        };
+      const endpoint = type === 'expense' 
+          ? `/api/expense/${id}?phone_number=${cleanPhoneNumber}` 
+          : `/api/income/${id}?phone_number=${cleanPhoneNumber}`;
+      
+      const updatedData = {
+          description: form.elements.description.value,
+          value: parseFloat(form.elements.value.value),
+          ...(type === 'expense' && { category: finalCategory })
+      };
 
-        try {
-            const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(updatedData),
-            });
-            if (!response.ok) {
-                const errData = await response.json();
-                throw new Error(errData.detail || 'Falha ao atualizar.');
-            }
-            const result = await response.json();
-            
-            setTransactions(prev => prev.map(t => 
-                (t.id === id && t.type === type) 
-                ? { ...t, 
-                    description: result.description, 
-                    value: parseFloat(result.value), 
-                    category: result.category,
-                    date: result.transaction_date || t.date 
-                  } 
-                : t
-            ));
-            setIsEditModalOpen(false);
-            setSelectedTransaction(null);
-        } catch (err) {
-            setModalError(err.message);
-        }
-    };
+      try {
+          const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(updatedData),
+          });
+          if (!response.ok) {
+              const errData = await response.json();
+              throw new Error(errData.detail || 'Falha ao atualizar.');
+          }
+          const result = await response.json();
+          
+          setTransactions(prev => prev.map(t => 
+              (t.id === id && t.type === type) 
+              ? { ...t, 
+                  description: result.description, 
+                  value: parseFloat(result.value), 
+                  category: result.category,
+                  date: result.transaction_date || t.date 
+                } 
+              : t
+          ));
+          setIsEditModalOpen(false);
+          setSelectedTransaction(null);
+      } catch (err) {
+          setModalError(err.message);
+      }
+  };
 
-    return (
-        <div className="bg-white p-6 rounded-lg shadow-md">
-            <h2 className="text-xl font-semibold text-gray-800 mb-4">Todas as Transações</h2>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="p-2 border rounded-md" />
-                <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="p-2 border rounded-md" />
-                <select value={filterCategory} onChange={e => setFilterCategory(e.target.value)} className="p-2 border rounded-md">
-                    <option value="all">Todas as Categorias</option>
-                    {categories.map(cat => <option key={cat.id} value={cat.name}>{cat.name}</option>)}
-                </select>
-                <input type="text" value={filterText} onChange={e => setFilterText(e.target.value)} placeholder="Pesquisar descrição..." className="p-2 border rounded-md" />
-            </div>
+  return (
+      <div className="bg-white p-6 rounded-lg shadow-md">
+          <h2 className="text-xl font-semibold text-gray-800 mb-4">Todas as Transações</h2>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+              <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="p-2 border rounded-md" />
+              <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="p-2 border rounded-md" />
+              <select value={filterCategory} onChange={e => setFilterCategory(e.target.value)} className="p-2 border rounded-md">
+                  <option value="all">Todas as Categorias</option>
+                  {categories.map(cat => <option key={cat.id} value={cat.name}>{cat.name}</option>)}
+              </select>
+              <input type="text" value={filterText} onChange={e => setFilterText(e.target.value)} placeholder="Pesquisar descrição..." className="p-2 border rounded-md" />
+          </div>
 
-            <div className="overflow-x-auto">
-                <table className="w-full text-sm text-left text-gray-500">
-                    <thead className="text-xs text-gray-700 uppercase bg-gray-50">
-                        <tr>
-                            <th scope="col" className="px-6 py-3">Data</th>
-                            <th scope="col" className="px-6 py-3">Descrição</th>
-                            <th scope="col" className="px-6 py-3">Categoria</th>
-                            <th scope="col" className="px-6 py-3">Valor</th>
-                            <th scope="col" className="px-6 py-3">Ações</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {filteredTransactions.map(t => (
-                            <tr key={`${t.type}-${t.id}`} className={`border-b ${t.type === 'income' ? 'bg-green-50' : 'bg-red-50'}`}>
-                                <td className="px-6 py-4">{new Date(t.date).toLocaleDateString('pt-BR')}</td>
-                                <td className="px-6 py-4 font-medium text-gray-900">{t.description}</td>
-                                <td className="px-6 py-4">{t.category || 'N/A'}</td>
-                                <td className={`px-6 py-4 font-bold ${t.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>
-                                    {t.type === 'income' ? '+' : '-'} R$ {t.value.toFixed(2).replace('.',',')}
-                                </td>
-                                <td className="px-6 py-4 flex items-center gap-3">
-                                    <button onClick={() => handleEdit(t)} className="text-blue-600 hover:text-blue-800"><Edit size={16} /></button>
-                                    <button onClick={() => handleDelete(t)} className="text-red-600 hover:text-red-800"><Trash2 size={16} /></button>
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </div>
-            {filteredTransactions.length === 0 && <p className="text-center text-gray-500 mt-6">Nenhuma transação encontrada para os filtros selecionados.</p>}
+          <div className="overflow-x-auto">
+              <table className="w-full text-sm text-left text-gray-500">
+                  <thead className="text-xs text-gray-700 uppercase bg-gray-50">
+                      <tr>
+                          <th scope="col" className="px-6 py-3">Data</th>
+                          <th scope="col" className="px-6 py-3">Descrição</th>
+                          <th scope="col" className="px-6 py-3">Categoria</th>
+                          <th scope="col" className="px-6 py-3">Valor</th>
+                          <th scope="col" className="px-6 py-3">Ações</th>
+                      </tr>
+                  </thead>
+                  <tbody>
+                      {filteredTransactions.map(t => (
+                          <tr key={`${t.type}-${t.id}`} className={`border-b ${t.type === 'income' ? 'bg-green-50' : 'bg-red-50'}`}>
+                              <td className="px-6 py-4">{new Date(t.date).toLocaleDateString('pt-BR')}</td>
+                              <td className="px-6 py-4 font-medium text-gray-900">{t.description}</td>
+                              <td className="px-6 py-4">{t.category || 'N/A'}</td>
+                              <td className={`px-6 py-4 font-bold ${t.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>
+                                  {t.type === 'income' ? '+' : '-'} R$ {t.value.toFixed(2).replace('.',',')}
+                              </td>
+                              <td className="px-6 py-4 flex items-center gap-3">
+                                  <button onClick={() => handleEdit(t)} className="text-blue-600 hover:text-blue-800"><Edit size={16} /></button>
+                                  <button onClick={() => handleDelete(t)} className="text-red-600 hover:text-red-800"><Trash2 size={16} /></button>
+                              </td>
+                          </tr>
+                      ))}
+                  </tbody>
+              </table>
+          </div>
+          {filteredTransactions.length === 0 && <p className="text-center text-gray-500 mt-6">Nenhuma transação encontrada para os filtros selecionados.</p>}
 
-            <Modal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} title="Editar Transação">
-                {selectedTransaction && (
-                    <form onSubmit={handleUpdate}>
-                        {modalError && <div className="bg-red-100 text-red-700 p-3 rounded-md mb-4 text-sm">{modalError}</div>}
-                        <div className="mb-4">
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Descrição</label>
-                            <input type="text" name="description" defaultValue={selectedTransaction.description} className="p-2 border rounded-md w-full" required />
-                        </div>
-                        <div className="mb-4">
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Valor</label>
-                            <input type="number" step="0.01" name="value" defaultValue={selectedTransaction.value} className="p-2 border rounded-md w-full" required />
-                        </div>
-                        {selectedTransaction.type === 'expense' && (
-                            <div className="mb-6">
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Categoria</label>
-                                <select 
-                                    name="category" 
-                                    defaultValue={selectedTransaction.category || 'Outros'}
-                                    onChange={(e) => setShowNewCategoryInput(e.target.value === 'new')}
-                                    className="p-2 border rounded-md w-full"
-                                >
-                                    {categories.map(cat => <option key={cat.id} value={cat.name}>{cat.name}</option>)}
-                                    <option value="new">-- Criar Nova Categoria --</option>
-                                </select>
-                                {showNewCategoryInput && (
-                                    <input 
-                                        type="text" 
-                                        name="newCategory" 
-                                        placeholder="Nome da nova categoria"
-                                        className="p-2 border rounded-md w-full mt-2"
-                                    />
-                                )}
-                            </div>
-                        )}
-                        <div className="flex justify-end gap-3 mt-6">
-                            <button type="button" onClick={() => setIsEditModalOpen(false)} className="bg-gray-200 text-gray-800 px-4 py-2 rounded-md hover:bg-gray-300">Cancelar</button>
-                            <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">Salvar</button>
-                        </div>
-                    </form>
-                )}
-            </Modal>
+          <Modal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} title="Editar Transação">
+              {selectedTransaction && (
+                  <form onSubmit={handleUpdate}>
+                      {modalError && <div className="bg-red-100 text-red-700 p-3 rounded-md mb-4 text-sm">{modalError}</div>}
+                      <div className="mb-4">
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Descrição</label>
+                          <input type="text" name="description" defaultValue={selectedTransaction.description} className="p-2 border rounded-md w-full" required />
+                      </div>
+                      <div className="mb-4">
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Valor</label>
+                          <input type="number" step="0.01" name="value" defaultValue={selectedTransaction.value} className="p-2 border rounded-md w-full" required />
+                      </div>
+                      {selectedTransaction.type === 'expense' && (
+                          <div className="mb-6">
+                              <label className="block text-sm font-medium text-gray-700 mb-1">Categoria</label>
+                              <select 
+                                  name="category" 
+                                  defaultValue={selectedTransaction.category || 'Outros'}
+                                  onChange={(e) => setShowNewCategoryInput(e.target.value === 'new')}
+                                  className="p-2 border rounded-md w-full"
+                              >
+                                  {categories.map(cat => <option key={cat.id} value={cat.name}>{cat.name}</option>)}
+                                  <option value="new">-- Criar Nova Categoria --</option>
+                              </select>
+                              {showNewCategoryInput && (
+                                  <input 
+                                      type="text" 
+                                      name="newCategory" 
+                                      placeholder="Nome da nova categoria"
+                                      className="p-2 border rounded-md w-full mt-2"
+                                  />
+                              )}
+                          </div>
+                      )}
+                      <div className="flex justify-end gap-3 mt-6">
+                          <button type="button" onClick={() => setIsEditModalOpen(false)} className="bg-gray-200 text-gray-800 px-4 py-2 rounded-md hover:bg-gray-300">Cancelar</button>
+                          <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">Salvar</button>
+                      </div>
+                  </form>
+              )}
+          </Modal>
 
-            <Modal isOpen={isDeleteModalOpen} onClose={() => setIsDeleteModalOpen(false)} title="Confirmar Exclusão">
-                {selectedTransaction && (
-                    <div>
-                        {modalError && <div className="bg-red-100 text-red-700 p-3 rounded-md mb-4 text-sm">{modalError}</div>}
-                        <p className="text-gray-700 mb-6">Tem a certeza que deseja apagar a transação: "{selectedTransaction.description}"?</p>
-                        <div className="flex justify-end gap-3">
-                            <button type="button" onClick={() => setIsDeleteModalOpen(false)} className="bg-gray-200 text-gray-800 px-4 py-2 rounded-md hover:bg-gray-300">Cancelar</button>
-                            <button type="button" onClick={confirmDelete} className="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700">Apagar</button>
-                        </div>
-                    </div>
-                )}
-            </Modal>
-        </div>
-    );
+          <Modal isOpen={isDeleteModalOpen} onClose={() => setIsDeleteModalOpen(false)} title="Confirmar Exclusão">
+              {selectedTransaction && (
+                  <div>
+                      {modalError && <div className="bg-red-100 text-red-700 p-3 rounded-md mb-4 text-sm">{modalError}</div>}
+                      <p className="text-gray-700 mb-6">Tem a certeza que deseja apagar a transação: "{selectedTransaction.description}"?</p>
+                      <div className="flex justify-end gap-3">
+                          <button type="button" onClick={() => setIsDeleteModalOpen(false)} className="bg-gray-200 text-gray-800 px-4 py-2 rounded-md hover:bg-gray-300">Cancelar</button>
+                          <button type="button" onClick={confirmDelete} className="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700">Apagar</button>
+                      </div>
+                  </div>
+              )}
+          </Modal>
+      </div>
+  );
 };
 
+// ... (Componente GerenciarCategoriasView permanece o mesmo)
 const GerenciarCategoriasView = ({ categories, setCategories, phoneNumber }) => {
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalMode, setModalMode] = useState('create'); // 'create' or 'edit'
+  const [selectedCategory, setSelectedCategory] = useState(null);
+  const [categoryName, setCategoryName] = useState('');
+  const [error, setError] = useState('');
+  
+  const API_BASE_URL = 'https://meu-gestor-fernando.onrender.com';
+
+  const openModal = (mode, category = null) => {
+      setModalMode(mode);
+      setSelectedCategory(category);
+      setCategoryName(category ? category.name : '');
+      setError('');
+      setIsModalOpen(true);
+  };
+
+  const handleSave = async (e) => {
+      e.preventDefault();
+      if (!categoryName) {
+          setError('O nome da categoria não pode estar vazio.');
+          return;
+      }
+      setError('');
+      const cleanPhoneNumber = phoneNumber.replace(/\D/g, '');
+
+      if (modalMode === 'create') {
+          try {
+              const response = await fetch(`${API_BASE_URL}/api/categories/${cleanPhoneNumber}`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ name: categoryName }),
+              });
+              if (!response.ok) throw new Error('Falha ao criar categoria.');
+              const newCategory = await response.json();
+              setCategories(prev => [...prev, newCategory].sort((a, b) => a.name.localeCompare(b.name)));
+              setIsModalOpen(false);
+          } catch (err) {
+              setError(err.message);
+          }
+      } else { // edit
+          try {
+              const response = await fetch(`${API_BASE_URL}/api/category/${selectedCategory.id}?phone_number=${cleanPhoneNumber}`, {
+                  method: 'PUT',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ name: categoryName }),
+              });
+              if (!response.ok) throw new Error('Falha ao editar categoria.');
+              const updatedCategory = await response.json();
+              setCategories(prev => prev.map(c => c.id === updatedCategory.id ? updatedCategory : c));
+              setIsModalOpen(false);
+          } catch (err) {
+              setError(err.message);
+          }
+      }
+  };
+  
+  const handleDelete = async (category) => {
+      // Usando o Modal customizado em vez do window.confirm
+      if (window.confirm(`Tem a certeza que quer apagar a categoria "${category.name}"?`)) {
+          const cleanPhoneNumber = phoneNumber.replace(/\D/g, '');
+          try {
+              const response = await fetch(`${API_BASE_URL}/api/category/${category.id}?phone_number=${cleanPhoneNumber}`, {
+                  method: 'DELETE',
+              });
+              if (!response.ok) throw new Error('Falha ao apagar categoria.');
+              setCategories(prev => prev.filter(c => c.id !== category.id));
+          } catch (err) {
+              alert(err.message);
+          }
+      }
+  };
+
+  return (
+      <div className="bg-white p-6 rounded-lg shadow-md">
+          <h2 className="text-xl font-semibold text-gray-800 mb-2">Gerenciar Categorias Personalizadas</h2>
+          <p className="text-sm text-gray-600 mb-6">A IA é capaz de identificar categorias automaticamente. No entanto, se preferir, você pode personalizar as categorias de acordo com suas necessidades.</p>
+          
+          <div className="mb-6">
+               <button onClick={() => openModal('create')} className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition flex items-center">
+                   <PlusCircle size={18} className="mr-2"/>
+                   Crie sua categoria
+               </button>
+          </div>
+
+          <div className="space-y-3">
+              {categories.map((cat, index) => (
+                  <div key={cat.id} className="flex justify-between items-center p-3 rounded-md" style={{ backgroundColor: index % 2 === 0 ? '#f9fafb' : '#fff' }}>
+                      <div className="flex items-center">
+                          <span className="w-3 h-3 rounded-full mr-4" style={{ backgroundColor: COLORS[index % COLORS.length] }}></span>
+                          <span className="text-gray-800 font-medium">{cat.name}</span>
+                          {cat.is_default && <span className="text-xs bg-gray-200 text-gray-600 px-2 py-1 rounded-full ml-3">Padrão</span>}
+                      </div>
+                      {!cat.is_default && (
+                           <div className="flex items-center gap-4">
+                               <button onClick={() => openModal('edit', cat)} className="text-sm text-blue-600 hover:text-blue-800 flex items-center gap-1">
+                                   <Edit size={14}/> Editar
+                               </button>
+                               <button onClick={() => handleDelete(cat)} className="text-sm text-red-600 hover:text-red-800 flex items-center gap-1">
+                                   <Trash2 size={14}/> Excluir
+                               </button>
+                           </div>
+                      )}
+                  </div>
+              ))}
+          </div>
+
+          <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={modalMode === 'create' ? 'Criar Nova Categoria' : 'Editar Categoria'}>
+              <form onSubmit={handleSave}>
+                  {error && <div className="bg-red-100 text-red-700 p-3 rounded-md mb-4 text-sm">{error}</div>}
+                  <div className="mb-4">
+                      <label htmlFor="categoryName" className="block text-sm font-medium text-gray-700 mb-1">Nome da Categoria</label>
+                      <input 
+                          type="text" 
+                          id="categoryName"
+                          value={categoryName}
+                          onChange={(e) => setCategoryName(e.target.value)}
+                          className="p-2 border rounded-md w-full" 
+                          required 
+                      />
+                  </div>
+                  <div className="flex justify-end gap-3 mt-6">
+                      <button type="button" onClick={() => setIsModalOpen(false)} className="bg-gray-200 text-gray-800 px-4 py-2 rounded-md hover:bg-gray-300">Cancelar</button>
+                      <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">Salvar</button>
+                  </div>
+              </form>
+          </Modal>
+      </div>
+  );
+};
+
+// ... (Componente AgendaView permanece o mesmo)
+const AgendaView = ({ reminders, setReminders, phoneNumber }) => {
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [selectedReminder, setSelectedReminder] = useState(null);
+  const [modalError, setModalError] = useState(null);
+  
+  const API_BASE_URL = 'https://meu-gestor-fernando.onrender.com';
+
+  // Função para formatar a data ISO para o input datetime-local
+  const formatToLocalDateTime = (isoString) => {
+      if (!isoString) return '';
+      const date = new Date(isoString);
+      // Subtrai o offset do fuso horário para exibir a hora local corretamente
+      date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
+      return date.toISOString().slice(0, 16);
+  };
+
+  const handleEdit = (reminder) => {
+      setModalError(null);
+      setSelectedReminder(reminder);
+      setIsEditModalOpen(true);
+  };
+
+  const handleDelete = (reminder) => {
+      setModalError(null);
+      setSelectedReminder(reminder);
+      setIsDeleteModalOpen(true);
+  };
+
+  const confirmDelete = async () => {
+      if (!selectedReminder) return;
+      setModalError(null);
+      const cleanPhoneNumber = phoneNumber.replace(/\D/g, '');
+      
+      try {
+          const response = await fetch(`${API_BASE_URL}/api/reminder/${selectedReminder.id}?phone_number=${cleanPhoneNumber}`, {
+              method: 'DELETE',
+          });
+          if (!response.ok) {
+              const errData = await response.json();
+              throw new Error(errData.detail || 'Falha ao apagar o lembrete.');
+          }
+          
+          setReminders(prev => prev.filter(r => r.id !== selectedReminder.id));
+          setIsDeleteModalOpen(false);
+          setSelectedReminder(null);
+      } catch (err) {
+          setModalError(err.message);
+      }
+  };
+  
+  const handleUpdate = async (e) => {
+      e.preventDefault();
+      if (!selectedReminder) return;
+      setModalError(null);
+      
+      const cleanPhoneNumber = phoneNumber.replace(/\D/g, '');
+      const form = e.target;
+      
+      // O valor do input 'datetime-local' já é a hora local do usuário
+      const localDateTime = new Date(form.elements.due_date.value);
+      
+      const updatedData = {
+          description: form.elements.description.value,
+          due_date: localDateTime.toISOString(), // Envia em formato ISO (UTC)
+      };
+
+      try {
+          const response = await fetch(`${API_BASE_URL}/api/reminder/${selectedReminder.id}?phone_number=${cleanPhoneNumber}`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(updatedData),
+          });
+          if (!response.ok) {
+              const errData = await response.json();
+              throw new Error(errData.detail || 'Falha ao atualizar o lembrete.');
+          }
+          const result = await response.json();
+          
+          setReminders(prev => prev.map(r => (r.id === result.id ? result : r)));
+          setIsEditModalOpen(false);
+          setSelectedReminder(null);
+      } catch (err) {
+          setModalError(err.message);
+      }
+  };
+
+  return (
+      <div className="bg-white p-6 rounded-lg shadow-md">
+          <h2 className="text-xl font-semibold text-gray-800 mb-6">Agenda de Lembretes</h2>
+          <div className="space-y-4">
+              {reminders.length > 0 ? (
+                  reminders.map(reminder => (
+                      <div key={reminder.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                          <div>
+                              <p className="font-semibold text-gray-800">{reminder.description}</p>
+                              <p className="text-sm text-gray-500">
+                                  {new Date(reminder.due_date).toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                              </p>
+                          </div>
+                          <div className="flex items-center gap-4">
+                              <button onClick={() => handleEdit(reminder)} className="text-sm text-blue-600 hover:text-blue-800"><Edit size={16}/></button>
+                              <button onClick={() => handleDelete(reminder)} className="text-sm text-red-600 hover:text-red-800"><Trash2 size={16}/></button>
+                          </div>
+                      </div>
+                  ))
+              ) : (
+                  <p className="text-center text-gray-500">Nenhum lembrete agendado.</p>
+              )}
+          </div>
+
+          <Modal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} title="Editar Lembrete">
+              {selectedReminder && (
+                  <form onSubmit={handleUpdate}>
+                      {modalError && <div className="bg-red-100 text-red-700 p-3 rounded-md mb-4 text-sm">{modalError}</div>}
+                      <div className="mb-4">
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Descrição</label>
+                          <input type="text" name="description" defaultValue={selectedReminder.description} className="p-2 border rounded-md w-full" required />
+                      </div>
+                      <div className="mb-4">
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Data e Hora</label>
+                          <input type="datetime-local" name="due_date" defaultValue={formatToLocalDateTime(selectedReminder.due_date)} className="p-2 border rounded-md w-full" required />
+                      </div>
+                      <div className="flex justify-end gap-3 mt-6">
+                          <button type="button" onClick={() => setIsEditModalOpen(false)} className="bg-gray-200 text-gray-800 px-4 py-2 rounded-md hover:bg-gray-300">Cancelar</button>
+                          <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">Salvar</button>
+                      </div>
+                  </form>
+              )}
+          </Modal>
+
+          <Modal isOpen={isDeleteModalOpen} onClose={() => setIsDeleteModalOpen(false)} title="Confirmar Exclusão">
+              {selectedReminder && (
+                  <div>
+                      {modalError && <div className="bg-red-100 text-red-700 p-3 rounded-md mb-4 text-sm">{modalError}</div>}
+                      <p className="text-gray-700 mb-6">Tem a certeza que deseja apagar o lembrete: "{selectedReminder.description}"?</p>
+                      <div className="flex justify-end gap-3">
+                          <button type="button" onClick={() => setIsDeleteModalOpen(false)} className="bg-gray-200 text-gray-800 px-4 py-2 rounded-md hover:bg-gray-300">Cancelar</button>
+                          <button type="button" onClick={confirmDelete} className="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700">Apagar</button>
+                      </div>
+                  </div>
+              )}
+          </Modal>
+      </div>
+  );
+};
+
+// --- NOVOS COMPONENTES PARA A TELA DE PLANEJAMENTO ---
+
+const PlanejamentoView = ({ plannedExpenses, setPlannedExpenses, phoneNumber }) => {
+    const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const [modalMode, setModalMode] = useState('create'); // 'create' or 'edit'
-    const [selectedCategory, setSelectedCategory] = useState(null);
-    const [categoryName, setCategoryName] = useState('');
-    const [error, setError] = useState('');
-    
+    const [editingExpense, setEditingExpense] = useState(null);
+    const [modalError, setModalError] = useState('');
     const API_BASE_URL = 'https://meu-gestor-fernando.onrender.com';
 
-    const openModal = (mode, category = null) => {
-        setModalMode(mode);
-        setSelectedCategory(category);
-        setCategoryName(category ? category.name : '');
-        setError('');
+    const handleStatusChange = async (expenseId, monthKey, newStatus) => {
+        const cleanPhoneNumber = phoneNumber.replace(/\D/g, '');
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/planning/status/${expenseId}?phone_number=${cleanPhoneNumber}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ monthKey, status: newStatus }),
+            });
+            if (!response.ok) throw new Error('Falha ao atualizar o status.');
+            
+            // Atualiza o estado local para refletir a mudança instantaneamente
+            setPlannedExpenses(prev => prev.map(exp => {
+                if (exp.id === expenseId) {
+                    const newStatuses = { ...exp.statuses, [monthKey]: newStatus };
+                    return { ...exp, statuses: newStatuses };
+                }
+                return exp;
+            }));
+        } catch (err) {
+            alert(err.message); // Simples alerta por enquanto
+        }
+    };
+
+    const handleSaveExpense = async (name, dueDay) => {
+        const cleanPhoneNumber = phoneNumber.replace(/\D/g, '');
+        setModalError('');
+        
+        try {
+            let response;
+            if (editingExpense) { // Editando
+                response = await fetch(`${API_BASE_URL}/api/planning/${editingExpense.id}?phone_number=${cleanPhoneNumber}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, dueDay: parseInt(dueDay) }),
+                });
+                if (!response.ok) throw new Error('Falha ao editar conta.');
+                const updatedExpense = await response.json();
+                setPlannedExpenses(prev => prev.map(exp => exp.id === editingExpense.id ? { ...exp, name: updatedExpense.name, dueDay: updatedExpense.dueDay } : exp));
+            } else { // Criando
+                response = await fetch(`${API_BASE_URL}/api/planning/${cleanPhoneNumber}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, dueDay: parseInt(dueDay) }),
+                });
+                if (!response.ok) throw new Error('Falha ao criar conta.');
+                const newExpense = await response.json();
+                setPlannedExpenses(prev => [...prev, newExpense]);
+            }
+            setIsModalOpen(false);
+        } catch (err) {
+            setModalError(err.message);
+        }
+    };
+
+    const handleDeleteExpense = async (expenseId) => {
+        if (!window.confirm("Tem certeza que deseja apagar esta conta do planejamento?")) return;
+        
+        const cleanPhoneNumber = phoneNumber.replace(/\D/g, '');
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/planning/${expenseId}?phone_number=${cleanPhoneNumber}`, {
+                method: 'DELETE',
+            });
+            if (!response.ok) throw new Error('Falha ao apagar conta.');
+            setPlannedExpenses(prev => prev.filter(exp => exp.id !== expenseId));
+        } catch (err) {
+            alert(err.message);
+        }
+    };
+
+    const openModal = (expense = null) => {
+        setEditingExpense(expense);
+        setModalError('');
         setIsModalOpen(true);
     };
 
-    const handleSave = async (e) => {
-        e.preventDefault();
-        if (!categoryName) {
-            setError('O nome da categoria não pode estar vazio.');
-            return;
-        }
-        setError('');
-        const cleanPhoneNumber = phoneNumber.replace(/\D/g, '');
-
-        if (modalMode === 'create') {
-            try {
-                const response = await fetch(`${API_BASE_URL}/api/categories/${cleanPhoneNumber}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ name: categoryName }),
-                });
-                if (!response.ok) throw new Error('Falha ao criar categoria.');
-                const newCategory = await response.json();
-                setCategories(prev => [...prev, newCategory].sort((a, b) => a.name.localeCompare(b.name)));
-                setIsModalOpen(false);
-            } catch (err) {
-                setError(err.message);
-            }
-        } else { // edit
-            try {
-                const response = await fetch(`${API_BASE_URL}/api/category/${selectedCategory.id}?phone_number=${cleanPhoneNumber}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ name: categoryName }),
-                });
-                if (!response.ok) throw new Error('Falha ao editar categoria.');
-                const updatedCategory = await response.json();
-                setCategories(prev => prev.map(c => c.id === updatedCategory.id ? updatedCategory : c));
-                setIsModalOpen(false);
-            } catch (err) {
-                setError(err.message);
-            }
-        }
-    };
-    
-    const handleDelete = async (category) => {
-        // Usando o Modal customizado em vez do window.confirm
-        if (window.confirm(`Tem a certeza que quer apagar a categoria "${category.name}"?`)) {
-            const cleanPhoneNumber = phoneNumber.replace(/\D/g, '');
-            try {
-                const response = await fetch(`${API_BASE_URL}/api/category/${category.id}?phone_number=${cleanPhoneNumber}`, {
-                    method: 'DELETE',
-                });
-                if (!response.ok) throw new Error('Falha ao apagar categoria.');
-                setCategories(prev => prev.filter(c => c.id !== category.id));
-            } catch (err) {
-                alert(err.message);
-            }
-        }
-    };
-
     return (
-        <div className="bg-white p-6 rounded-lg shadow-md">
-            <h2 className="text-xl font-semibold text-gray-800 mb-2">Gerenciar Categorias Personalizadas</h2>
-            <p className="text-sm text-gray-600 mb-6">A IA é capaz de identificar categorias automaticamente. No entanto, se preferir, você pode personalizar as categorias de acordo com suas necessidades.</p>
-            
-            <div className="mb-6">
-                 <button onClick={() => openModal('create')} className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition flex items-center">
-                    <PlusCircle size={18} className="mr-2"/>
-                    Crie sua categoria
+        <div>
+            <div className="flex flex-wrap justify-between items-center mb-6 gap-4">
+                <div className="flex items-center space-x-2 sm:space-x-4">
+                    <button onClick={() => setCurrentYear(y => y - 1)} className="p-2 rounded-full hover:bg-gray-200 transition-colors"><ArrowLeft size={20} /></button>
+                    <h2 className="text-2xl font-bold flex items-center"><Calendar size={24} className="mr-2 text-blue-600" /> {currentYear}</h2>
+                    <button onClick={() => setCurrentYear(y => y + 1)} className="p-2 rounded-full hover:bg-gray-200 transition-colors"><ArrowRight size={20} /></button>
+                </div>
+                <button
+                    onClick={() => openModal()}
+                    className="flex items-center bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-blue-700 transition-all duration-300 transform hover:scale-105">
+                    <PlusCircle size={20} className="mr-2" />
+                    Adicionar Conta
                 </button>
             </div>
 
-            <div className="space-y-3">
-                {categories.map((cat, index) => (
-                    <div key={cat.id} className="flex justify-between items-center p-3 rounded-md" style={{ backgroundColor: index % 2 === 0 ? '#f9fafb' : '#fff' }}>
-                        <div className="flex items-center">
-                            <span className="w-3 h-3 rounded-full mr-4" style={{ backgroundColor: COLORS[index % COLORS.length] }}></span>
-                            <span className="text-gray-800 font-medium">{cat.name}</span>
-                            {cat.is_default && <span className="text-xs bg-gray-200 text-gray-600 px-2 py-1 rounded-full ml-3">Padrão</span>}
-                        </div>
-                        {!cat.is_default && (
-                             <div className="flex items-center gap-4">
-                                 <button onClick={() => openModal('edit', cat)} className="text-sm text-blue-600 hover:text-blue-800 flex items-center gap-1">
-                                    <Edit size={14}/> Editar
-                                 </button>
-                                 <button onClick={() => handleDelete(cat)} className="text-sm text-red-600 hover:text-red-800 flex items-center gap-1">
-                                    <Trash2 size={14}/> Excluir
-                                 </button>
-                             </div>
-                        )}
+            <div className="bg-white rounded-lg shadow overflow-x-auto">
+                {plannedExpenses.length > 0 ? (
+                    <PlanningTable 
+                        expenses={plannedExpenses} 
+                        year={currentYear}
+                        onStatusChange={handleStatusChange}
+                        onEdit={openModal}
+                        onDelete={handleDeleteExpense}
+                    />
+                ) : (
+                    <div className="text-center py-16 px-6">
+                        <h3 className="text-xl font-semibold text-gray-800">Nenhuma conta planejada ainda</h3>
+                        <p className="text-gray-500 mt-2 mb-6">Comece a organizar suas contas fixas mensais clicando no botão "Adicionar Conta".</p>
+                        <button
+                            onClick={() => openModal()}
+                            className="flex items-center mx-auto bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-blue-700">
+                            <PlusCircle size={20} className="mr-2" />
+                            Adicionar Primeira Conta
+                        </button>
                     </div>
-                ))}
+                )}
             </div>
 
-            <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={modalMode === 'create' ? 'Criar Nova Categoria' : 'Editar Categoria'}>
-                <form onSubmit={handleSave}>
-                    {error && <div className="bg-red-100 text-red-700 p-3 rounded-md mb-4 text-sm">{error}</div>}
-                    <div className="mb-4">
-                        <label htmlFor="categoryName" className="block text-sm font-medium text-gray-700 mb-1">Nome da Categoria</label>
-                        <input 
-                            type="text" 
-                            id="categoryName"
-                            value={categoryName}
-                            onChange={(e) => setCategoryName(e.target.value)}
-                            className="p-2 border rounded-md w-full" 
-                            required 
-                        />
-                    </div>
-                    <div className="flex justify-end gap-3 mt-6">
-                        <button type="button" onClick={() => setIsModalOpen(false)} className="bg-gray-200 text-gray-800 px-4 py-2 rounded-md hover:bg-gray-300">Cancelar</button>
-                        <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">Salvar</button>
-                    </div>
-                </form>
-            </Modal>
+            <PlannedExpenseModal 
+                isOpen={isModalOpen}
+                onClose={() => setIsModalOpen(false)}
+                onSave={handleSaveExpense}
+                expense={editingExpense}
+                error={modalError}
+            />
         </div>
     );
 };
 
-const AgendaView = ({ reminders, setReminders, phoneNumber }) => {
-    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-    const [selectedReminder, setSelectedReminder] = useState(null);
-    const [modalError, setModalError] = useState(null);
+const PlanningTable = ({ expenses, year, onStatusChange, onEdit, onDelete }) => {
+    const months = useMemo(() => Array.from({ length: 12 }, (_, i) => {
+        const date = new Date(year, i, 1);
+        return date.toLocaleString('pt-BR', { month: 'short' }).replace('.', '').toUpperCase();
+    }), [year]);
+
+    return (
+        <table className="w-full min-w-[1000px]">
+            <thead>
+                <tr className="bg-gray-50">
+                    <th className="text-left font-semibold text-gray-600 p-3 w-1/4">Conta Planejada</th>
+                    {months.map(month => (
+                        <th key={month} className="text-center font-semibold text-gray-600 p-3">{month}</th>
+                    ))}
+                    <th className="text-center font-semibold text-gray-600 p-3">Ações</th>
+                </tr>
+            </thead>
+            <tbody>
+                {expenses.map((expense) => (
+                    <tr key={expense.id} className="border-b border-gray-200 last:border-0 hover:bg-gray-50">
+                        <td className="p-3 font-medium">
+                            <div className="flex flex-col">
+                                <span className="text-gray-800">{expense.name}</span>
+                                <span className="text-xs text-gray-500">Vence todo dia {expense.dueDay}</span>
+                            </div>
+                        </td>
+                        {Array.from({ length: 12 }, (_, i) => i + 1).map(month => (
+                            <td key={`${expense.id}-${month}`} className="p-3 text-center">
+                                <StatusSelector
+                                    expense={expense}
+                                    month={month}
+                                    year={year}
+                                    onStatusChange={onStatusChange}
+                                />
+                            </td>
+                        ))}
+                        <td className="p-3 text-center">
+                            <ActionMenu 
+                                onEdit={() => onEdit(expense)}
+                                onDelete={() => onDelete(expense.id)}
+                            />
+                        </td>
+                    </tr>
+                ))}
+            </tbody>
+        </table>
+    );
+};
+
+const StatusSelector = ({ expense, month, year, onStatusChange }) => {
+    const monthKey = `${year}-${String(month).padStart(2, '0')}`;
+    const currentStatus = expense.statuses?.[monthKey] || 'Pendente';
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const dueDate = new Date(year, month - 1, expense.dueDay);
     
-    const API_BASE_URL = 'https://meu-gestor-fernando.onrender.com';
+    const isOverdue = currentStatus === 'Pendente' && today > dueDate;
 
-    // Função para formatar a data ISO para o input datetime-local
-    const formatToLocalDateTime = (isoString) => {
-        if (!isoString) return '';
-        const date = new Date(isoString);
-        // Subtrai o offset do fuso horário para exibir a hora local corretamente
-        date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
-        return date.toISOString().slice(0, 16);
-    };
-
-    const handleEdit = (reminder) => {
-        setModalError(null);
-        setSelectedReminder(reminder);
-        setIsEditModalOpen(true);
-    };
-
-    const handleDelete = (reminder) => {
-        setModalError(null);
-        setSelectedReminder(reminder);
-        setIsDeleteModalOpen(true);
-    };
-
-    const confirmDelete = async () => {
-        if (!selectedReminder) return;
-        setModalError(null);
-        const cleanPhoneNumber = phoneNumber.replace(/\D/g, '');
-        
-        try {
-            const response = await fetch(`${API_BASE_URL}/api/reminder/${selectedReminder.id}?phone_number=${cleanPhoneNumber}`, {
-                method: 'DELETE',
-            });
-            if (!response.ok) {
-                const errData = await response.json();
-                throw new Error(errData.detail || 'Falha ao apagar o lembrete.');
-            }
-            
-            setReminders(prev => prev.filter(r => r.id !== selectedReminder.id));
-            setIsDeleteModalOpen(false);
-            setSelectedReminder(null);
-        } catch (err) {
-            setModalError(err.message);
-        }
-    };
+    const statusOptions = ['Pago', 'Pendente'];
     
-    const handleUpdate = async (e) => {
-        e.preventDefault();
-        if (!selectedReminder) return;
-        setModalError(null);
-        
-        const cleanPhoneNumber = phoneNumber.replace(/\D/g, '');
-        const form = e.target;
-        
-        // O valor do input 'datetime-local' já é a hora local do usuário
-        const localDateTime = new Date(form.elements.due_date.value);
-        
-        const updatedData = {
-            description: form.elements.description.value,
-            due_date: localDateTime.toISOString(), // Envia em formato ISO (UTC)
-        };
-
-        try {
-            const response = await fetch(`${API_BASE_URL}/api/reminder/${selectedReminder.id}?phone_number=${cleanPhoneNumber}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(updatedData),
-            });
-            if (!response.ok) {
-                const errData = await response.json();
-                throw new Error(errData.detail || 'Falha ao atualizar o lembrete.');
-            }
-            const result = await response.json();
-            
-            setReminders(prev => prev.map(r => (r.id === result.id ? result : r)));
-            setIsEditModalOpen(false);
-            setSelectedReminder(null);
-        } catch (err) {
-            setModalError(err.message);
+    const getStatusClasses = (status) => {
+        if (isOverdue) return 'bg-red-100 text-red-800 border-red-300';
+        switch (status) {
+            case 'Pago': return 'bg-green-100 text-green-800 border-green-300';
+            case 'Pendente': return 'bg-yellow-100 text-yellow-800 border-yellow-300';
+            default: return 'bg-gray-100 text-gray-800 border-gray-300';
         }
     };
 
     return (
-        <div className="bg-white p-6 rounded-lg shadow-md">
-            <h2 className="text-xl font-semibold text-gray-800 mb-6">Agenda de Lembretes</h2>
-            <div className="space-y-4">
-                {reminders.length > 0 ? (
-                    reminders.map(reminder => (
-                        <div key={reminder.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                            <div>
-                                <p className="font-semibold text-gray-800">{reminder.description}</p>
-                                <p className="text-sm text-gray-500">
-                                    {new Date(reminder.due_date).toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                                </p>
-                            </div>
-                            <div className="flex items-center gap-4">
-                                <button onClick={() => handleEdit(reminder)} className="text-sm text-blue-600 hover:text-blue-800"><Edit size={16}/></button>
-                                <button onClick={() => handleDelete(reminder)} className="text-sm text-red-600 hover:text-red-800"><Trash2 size={16}/></button>
-                            </div>
-                        </div>
-                    ))
-                ) : (
-                    <p className="text-center text-gray-500">Nenhum lembrete agendado.</p>
-                )}
-            </div>
+        <select
+            value={currentStatus}
+            onChange={(e) => onStatusChange(expense.id, monthKey, e.target.value)}
+            className={`text-xs font-medium py-1 px-2 rounded-full border appearance-none text-center focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors ${getStatusClasses(currentStatus)}`}
+        >
+            {isOverdue && <option value="Pendente">Atrasado</option>}
+            {statusOptions.map(opt => (
+                <option key={opt} value={opt}>{opt}</option>
+            ))}
+        </select>
+    );
+};
 
-            <Modal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} title="Editar Lembrete">
-                {selectedReminder && (
-                    <form onSubmit={handleUpdate}>
-                        {modalError && <div className="bg-red-100 text-red-700 p-3 rounded-md mb-4 text-sm">{modalError}</div>}
-                        <div className="mb-4">
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Descrição</label>
-                            <input type="text" name="description" defaultValue={selectedReminder.description} className="p-2 border rounded-md w-full" required />
-                        </div>
-                        <div className="mb-4">
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Data e Hora</label>
-                            <input type="datetime-local" name="due_date" defaultValue={formatToLocalDateTime(selectedReminder.due_date)} className="p-2 border rounded-md w-full" required />
-                        </div>
-                        <div className="flex justify-end gap-3 mt-6">
-                            <button type="button" onClick={() => setIsEditModalOpen(false)} className="bg-gray-200 text-gray-800 px-4 py-2 rounded-md hover:bg-gray-300">Cancelar</button>
-                            <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">Salvar</button>
-                        </div>
-                    </form>
-                )}
-            </Modal>
-
-            <Modal isOpen={isDeleteModalOpen} onClose={() => setIsDeleteModalOpen(false)} title="Confirmar Exclusão">
-                {selectedReminder && (
-                    <div>
-                        {modalError && <div className="bg-red-100 text-red-700 p-3 rounded-md mb-4 text-sm">{modalError}</div>}
-                        <p className="text-gray-700 mb-6">Tem a certeza que deseja apagar o lembrete: "{selectedReminder.description}"?</p>
-                        <div className="flex justify-end gap-3">
-                            <button type="button" onClick={() => setIsDeleteModalOpen(false)} className="bg-gray-200 text-gray-800 px-4 py-2 rounded-md hover:bg-gray-300">Cancelar</button>
-                            <button type="button" onClick={confirmDelete} className="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700">Apagar</button>
-                        </div>
+const ActionMenu = ({ onEdit, onDelete }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    return (
+        <div className="relative inline-block text-left">
+            <button onClick={() => setIsOpen(!isOpen)} onBlur={() => setTimeout(() => setIsOpen(false), 150)} className="p-2 rounded-full hover:bg-gray-200">
+                <MoreVertical size={20} />
+            </button>
+            {isOpen && (
+                <div className="origin-top-right absolute right-0 mt-2 w-40 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-10">
+                    <div className="py-1">
+                        <button onClick={onEdit} className="w-full text-left flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                            <Edit size={16} className="mr-2" /> Editar
+                        </button>
+                        <button onClick={onDelete} className="w-full text-left flex items-center px-4 py-2 text-sm text-red-600 hover:bg-gray-100">
+                            <Trash2 size={16} className="mr-2" /> Apagar
+                        </button>
                     </div>
-                )}
-            </Modal>
+                </div>
+            )}
         </div>
+    );
+};
+
+const PlannedExpenseModal = ({ isOpen, onClose, onSave, expense, error }) => {
+    const [name, setName] = useState('');
+    const [dueDay, setDueDay] = useState('');
+
+    useEffect(() => {
+        if (expense) {
+            setName(expense.name);
+            setDueDay(expense.dueDay);
+        } else {
+            setName('');
+            setDueDay('');
+        }
+    }, [expense, isOpen]);
+
+    const handleSubmit = (e) => {
+        e.preventDefault();
+        if (name && dueDay > 0 && dueDay <= 31) {
+            onSave(name, dueDay);
+        }
+    };
+
+    return (
+        <Modal isOpen={isOpen} onClose={onClose} title={expense ? 'Editar Conta Planejada' : 'Adicionar Nova Conta'}>
+            <form onSubmit={handleSubmit}>
+                {error && <div className="bg-red-100 text-red-700 p-3 rounded-md mb-4 text-sm">{error}</div>}
+                <div className="mb-4">
+                    <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">Nome da Conta</label>
+                    <input
+                        type="text"
+                        id="name"
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        placeholder="Ex: Aluguel, Internet"
+                        className="p-2 border rounded-md w-full"
+                        required
+                    />
+                </div>
+                <div>
+                    <label htmlFor="dueDay" className="block text-sm font-medium text-gray-700 mb-1">Dia do Vencimento</label>
+                    <input
+                        type="number"
+                        id="dueDay"
+                        value={dueDay}
+                        onChange={(e) => setDueDay(e.target.value)}
+                        placeholder="Ex: 5, 15, 25"
+                        min="1"
+                        max="31"
+                        className="p-2 border rounded-md w-full"
+                        required
+                    />
+                </div>
+                 <div className="flex justify-end gap-3 mt-6">
+                    <button type="button" onClick={onClose} className="bg-gray-200 text-gray-800 px-4 py-2 rounded-md hover:bg-gray-300">Cancelar</button>
+                    <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">Salvar</button>
+                </div>
+            </form>
+        </Modal>
     );
 };
 
@@ -745,7 +1061,8 @@ const App = () => {
   const [allTransactions, setAllTransactions] = useState([]);
   const [categories, setCategories] = useState([]);
   const [reminders, setReminders] = useState([]);
-  const [loading, setLoading] = useState(true); // Começa true para verificar login
+  const [plannedExpenses, setPlannedExpenses] = useState([]); // NOVO ESTADO
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [activeView, setActiveView] = useState('visaoGeral');
 
@@ -768,9 +1085,9 @@ const App = () => {
       setApiData(result);
       setCategories(result.categories || []);
       setReminders(result.reminders || []);
+      setPlannedExpenses(result.planned_expenses || []); // POPULA O NOVO ESTADO
     } catch (err) {
       setError(err.message);
-      // Limpa o local storage se o número salvo for inválido
       localStorage.removeItem('meuGestorNumero'); 
     } finally {
       setLoading(false);
@@ -784,11 +1101,11 @@ const App = () => {
     setAllTransactions([]);
     setCategories([]);
     setReminders([]);
+    setPlannedExpenses([]); // LIMPA O NOVO ESTADO
     setError(null);
     setActiveView('visaoGeral');
   };
 
-  // Efeito para verificar login salvo ou token na URL ao carregar o app
   useEffect(() => {
     const initializeApp = async () => {
       const savedNumber = localStorage.getItem('meuGestorNumero');
@@ -796,11 +1113,9 @@ const App = () => {
       const token = urlParams.get('token');
 
       if (savedNumber) {
-        // Se tem número salvo, loga automaticamente
         setPhoneNumber(savedNumber);
         await handleFetchData(savedNumber);
       } else if (token) {
-        // Se não tem número salvo, mas tem token, verifica o token
         try {
           const response = await fetch(`${API_BASE_URL}/api/verify-token/${token}`);
           if (!response.ok) {
@@ -809,19 +1124,16 @@ const App = () => {
           }
           const data = await response.json();
           
-          // Salva o número no localStorage para futuros acessos
           localStorage.setItem('meuGestorNumero', data.phone_number);
           setPhoneNumber(data.phone_number);
           
           await handleFetchData(data.phone_number);
-          // Limpa o token da URL
           window.history.replaceState({}, document.title, window.location.pathname);
         } catch (err) {
           setError(err.message);
           setLoading(false);
         }
       } else {
-        // Se não tem nem número salvo nem token, apenas para de carregar
         setLoading(false);
       }
     };
@@ -916,6 +1228,8 @@ const App = () => {
             {activeView === 'tabela' && <TabelaTransacoesView transactions={allTransactions} setTransactions={setAllTransactions} phoneNumber={phoneNumber} categories={categories} setCategories={setCategories} />}
             {activeView === 'gerenciarCategorias' && <GerenciarCategoriasView categories={categories} setCategories={setCategories} phoneNumber={phoneNumber} />}
             {activeView === 'agenda' && <AgendaView reminders={reminders} setReminders={setReminders} phoneNumber={phoneNumber} />}
+            {/* RENDERIZAÇÃO DA NOVA VIEW DE PLANEJAMENTO */}
+            {activeView === 'planejamento' && <PlanejamentoView plannedExpenses={plannedExpenses} setPlannedExpenses={setPlannedExpenses} phoneNumber={phoneNumber} />}
           </>
         )}
       </div>
