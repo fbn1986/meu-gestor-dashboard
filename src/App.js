@@ -4,7 +4,7 @@ import {
     Search, Loader, AlertCircle, TrendingUp, TrendingDown, DollarSign, Wallet, 
     LayoutDashboard, List, ChevronDown, ChevronUp, Database, Edit, Trash2, X, 
     PlusCircle, Tag, Calendar, LogOut, MoreVertical, ArrowLeft, ArrowRight,
-    ClipboardList // Novo ícone para Planejamento
+    ClipboardList // Ícone para Planejamento
 } from 'lucide-react';
 
 // Cores para o gráfico e cards
@@ -28,11 +28,11 @@ const Header = ({ onFetch, loading, phoneNumber, setPhoneNumber, activeView, set
             placeholder="Seu nº WhatsApp (só números)"
             className="p-2 border rounded-md focus:ring-2 focus:ring-blue-500 transition w-40 sm:w-48"
             onKeyPress={(e) => e.key === 'Enter' && onFetch()}
-            disabled={isLoggedIn} // Desabilita se já estiver logado
+            disabled={isLoggedIn}
           />
           <button
             onClick={() => onFetch()}
-            disabled={loading || isLoggedIn} // Desabilita se carregando ou logado
+            disabled={loading || isLoggedIn}
             className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition flex items-center disabled:bg-gray-400"
           >
             {loading ? <Loader className="animate-spin sm:mr-2" size={20}/> : <Search size={20} className="sm:mr-2"/>}
@@ -57,7 +57,6 @@ const Header = ({ onFetch, loading, phoneNumber, setPhoneNumber, activeView, set
             >
             <LayoutDashboard size={16} /> Visão Geral
             </button>
-            {/* NOVO BOTÃO DE NAVEGAÇÃO PARA PLANEJAMENTO */}
             <button 
             onClick={() => setActiveView('planejamento')}
             className={`py-3 px-1 text-sm font-medium border-b-2 flex items-center gap-2 whitespace-nowrap ${activeView === 'planejamento' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
@@ -231,7 +230,6 @@ const Modal = ({ isOpen, onClose, title, children }) => {
     );
 };
 
-// ... (Componente TabelaTransacoesView permanece o mesmo)
 const TabelaTransacoesView = ({ transactions, setTransactions, phoneNumber, categories, setCategories }) => {
   const [filterText, setFilterText] = useState('');
   const [filterCategory, setFilterCategory] = useState('all');
@@ -472,10 +470,9 @@ const TabelaTransacoesView = ({ transactions, setTransactions, phoneNumber, cate
   );
 };
 
-// ... (Componente GerenciarCategoriasView permanece o mesmo)
 const GerenciarCategoriasView = ({ categories, setCategories, phoneNumber }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [modalMode, setModalMode] = useState('create'); // 'create' or 'edit'
+  const [modalMode, setModalMode] = useState('create');
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [categoryName, setCategoryName] = useState('');
   const [error, setError] = useState('');
@@ -513,7 +510,7 @@ const GerenciarCategoriasView = ({ categories, setCategories, phoneNumber }) => 
           } catch (err) {
               setError(err.message);
           }
-      } else { // edit
+      } else {
           try {
               const response = await fetch(`${API_BASE_URL}/api/category/${selectedCategory.id}?phone_number=${cleanPhoneNumber}`, {
                   method: 'PUT',
@@ -531,7 +528,6 @@ const GerenciarCategoriasView = ({ categories, setCategories, phoneNumber }) => 
   };
   
   const handleDelete = async (category) => {
-      // Usando o Modal customizado em vez do window.confirm
       if (window.confirm(`Tem a certeza que quer apagar a categoria "${category.name}"?`)) {
           const cleanPhoneNumber = phoneNumber.replace(/\D/g, '');
           try {
@@ -604,7 +600,6 @@ const GerenciarCategoriasView = ({ categories, setCategories, phoneNumber }) => 
   );
 };
 
-// ... (Componente AgendaView permanece o mesmo)
 const AgendaView = ({ reminders, setReminders, phoneNumber }) => {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -613,11 +608,9 @@ const AgendaView = ({ reminders, setReminders, phoneNumber }) => {
   
   const API_BASE_URL = 'https://meu-gestor-fernando.onrender.com';
 
-  // Função para formatar a data ISO para o input datetime-local
   const formatToLocalDateTime = (isoString) => {
       if (!isoString) return '';
       const date = new Date(isoString);
-      // Subtrai o offset do fuso horário para exibir a hora local corretamente
       date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
       return date.toISOString().slice(0, 16);
   };
@@ -664,12 +657,11 @@ const AgendaView = ({ reminders, setReminders, phoneNumber }) => {
       const cleanPhoneNumber = phoneNumber.replace(/\D/g, '');
       const form = e.target;
       
-      // O valor do input 'datetime-local' já é a hora local do usuário
       const localDateTime = new Date(form.elements.due_date.value);
       
       const updatedData = {
           description: form.elements.description.value,
-          due_date: localDateTime.toISOString(), // Envia em formato ISO (UTC)
+          due_date: localDateTime.toISOString(),
       };
 
       try {
@@ -752,8 +744,6 @@ const AgendaView = ({ reminders, setReminders, phoneNumber }) => {
   );
 };
 
-// --- NOVOS COMPONENTES PARA A TELA DE PLANEJAMENTO ---
-
 const PlanejamentoView = ({ plannedExpenses, setPlannedExpenses, phoneNumber }) => {
     const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -771,7 +761,6 @@ const PlanejamentoView = ({ plannedExpenses, setPlannedExpenses, phoneNumber }) 
             });
             if (!response.ok) throw new Error('Falha ao atualizar o status.');
             
-            // Atualiza o estado local para refletir a mudança instantaneamente
             setPlannedExpenses(prev => prev.map(exp => {
                 if (exp.id === expenseId) {
                     const newStatuses = { ...exp.statuses, [monthKey]: newStatus };
@@ -780,7 +769,7 @@ const PlanejamentoView = ({ plannedExpenses, setPlannedExpenses, phoneNumber }) 
                 return exp;
             }));
         } catch (err) {
-            alert(err.message); // Simples alerta por enquanto
+            alert(err.message);
         }
     };
 
@@ -790,7 +779,7 @@ const PlanejamentoView = ({ plannedExpenses, setPlannedExpenses, phoneNumber }) 
         
         try {
             let response;
-            if (editingExpense) { // Editando
+            if (editingExpense) {
                 response = await fetch(`${API_BASE_URL}/api/planning/${editingExpense.id}?phone_number=${cleanPhoneNumber}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
@@ -799,7 +788,7 @@ const PlanejamentoView = ({ plannedExpenses, setPlannedExpenses, phoneNumber }) 
                 if (!response.ok) throw new Error('Falha ao editar conta.');
                 const updatedExpense = await response.json();
                 setPlannedExpenses(prev => prev.map(exp => exp.id === editingExpense.id ? { ...exp, name: updatedExpense.name, dueDay: updatedExpense.dueDay } : exp));
-            } else { // Criando
+            } else {
                 response = await fetch(`${API_BASE_URL}/api/planning/${cleanPhoneNumber}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -935,37 +924,58 @@ const PlanningTable = ({ expenses, year, onStatusChange, onEdit, onDelete }) => 
     );
 };
 
+// --- COMPONENTE ATUALIZADO COM A NOVA LÓGICA DE STATUS ---
 const StatusSelector = ({ expense, month, year, onStatusChange }) => {
     const monthKey = `${year}-${String(month).padStart(2, '0')}`;
-    const currentStatus = expense.statuses?.[monthKey] || 'Pendente';
+    const actualStatus = expense.statuses?.[monthKey]; // Pode ser 'Pago', 'Pendente', ou undefined
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const dueDate = new Date(year, month - 1, expense.dueDay);
-    
-    const isOverdue = currentStatus === 'Pendente' && today > dueDate;
+    const endOfMonth = new Date(year, month, 0); // Pega o último dia do mês para a comparação
 
-    const statusOptions = ['Pago', 'Pendente'];
+    let displayStatus;
+    let isDisabled = false;
+    const effectiveStatus = actualStatus || 'Pendente'; // O valor do select é sempre 'Pago' ou 'Pendente'
+
+    if (endOfMonth < today) { // Se o mês inteiro já passou
+        if (!actualStatus) {
+            // Se nunca houve um status ('Pago' ou 'Pendente'), significa que não foi lançado
+            displayStatus = 'N/A';
+            isDisabled = true;
+        } else if (actualStatus === 'Pendente') {
+            // Se o status era 'Pendente' e o mês passou, está atrasado
+            displayStatus = 'Atrasado';
+        } else {
+            // Se o status era 'Pago'
+            displayStatus = 'Pago';
+        }
+    } else { // Mês atual ou futuro
+        displayStatus = actualStatus === 'Pago' ? 'Pago' : 'Pendente';
+    }
     
-    const getStatusClasses = (status) => {
-        if (isOverdue) return 'bg-red-100 text-red-800 border-red-300';
-        switch (status) {
+    const getStatusClasses = () => {
+        switch (displayStatus) {
             case 'Pago': return 'bg-green-100 text-green-800 border-green-300';
             case 'Pendente': return 'bg-yellow-100 text-yellow-800 border-yellow-300';
+            case 'Atrasado': return 'bg-red-100 text-red-800 border-red-300';
+            case 'N/A': return 'bg-gray-100 text-gray-500 border-gray-300 cursor-not-allowed';
             default: return 'bg-gray-100 text-gray-800 border-gray-300';
         }
     };
 
     return (
         <select
-            value={currentStatus}
+            value={effectiveStatus}
             onChange={(e) => onStatusChange(expense.id, monthKey, e.target.value)}
-            className={`text-xs font-medium py-1 px-2 rounded-full border appearance-none text-center focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors ${getStatusClasses(currentStatus)}`}
+            disabled={isDisabled}
+            className={`text-xs font-medium py-1 px-2 rounded-full border appearance-none text-center focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors ${getStatusClasses()}`}
         >
-            {isOverdue && <option value="Pendente">Atrasado</option>}
-            {statusOptions.map(opt => (
-                <option key={opt} value={opt}>{opt}</option>
-            ))}
+            {/* A opção visível reflete o status calculado, mas o valor real é mantido */}
+            <option value={effectiveStatus} hidden>{displayStatus}</option>
+            
+            {/* Opções reais para o usuário selecionar */}
+            <option value="Pago">Pago</option>
+            <option value="Pendente">Pendente</option>
         </select>
     );
 };
@@ -1053,15 +1063,13 @@ const PlannedExpenseModal = ({ isOpen, onClose, onSave, expense, error }) => {
     );
 };
 
-
-// --- Componente Principal ---
 const App = () => {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [apiData, setApiData] = useState(null);
   const [allTransactions, setAllTransactions] = useState([]);
   const [categories, setCategories] = useState([]);
   const [reminders, setReminders] = useState([]);
-  const [plannedExpenses, setPlannedExpenses] = useState([]); // NOVO ESTADO
+  const [plannedExpenses, setPlannedExpenses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [activeView, setActiveView] = useState('visaoGeral');
@@ -1085,7 +1093,7 @@ const App = () => {
       setApiData(result);
       setCategories(result.categories || []);
       setReminders(result.reminders || []);
-      setPlannedExpenses(result.planned_expenses || []); // POPULA O NOVO ESTADO
+      setPlannedExpenses(result.planned_expenses || []);
     } catch (err) {
       setError(err.message);
       localStorage.removeItem('meuGestorNumero'); 
@@ -1101,7 +1109,7 @@ const App = () => {
     setAllTransactions([]);
     setCategories([]);
     setReminders([]);
-    setPlannedExpenses([]); // LIMPA O NOVO ESTADO
+    setPlannedExpenses([]);
     setError(null);
     setActiveView('visaoGeral');
   };
@@ -1228,7 +1236,6 @@ const App = () => {
             {activeView === 'tabela' && <TabelaTransacoesView transactions={allTransactions} setTransactions={setAllTransactions} phoneNumber={phoneNumber} categories={categories} setCategories={setCategories} />}
             {activeView === 'gerenciarCategorias' && <GerenciarCategoriasView categories={categories} setCategories={setCategories} phoneNumber={phoneNumber} />}
             {activeView === 'agenda' && <AgendaView reminders={reminders} setReminders={setReminders} phoneNumber={phoneNumber} />}
-            {/* RENDERIZAÇÃO DA NOVA VIEW DE PLANEJAMENTO */}
             {activeView === 'planejamento' && <PlanejamentoView plannedExpenses={plannedExpenses} setPlannedExpenses={setPlannedExpenses} phoneNumber={phoneNumber} />}
           </>
         )}
