@@ -4,7 +4,7 @@ import {
     Search, Loader, AlertCircle, TrendingUp, TrendingDown, DollarSign, Wallet, 
     LayoutDashboard, List, ChevronDown, ChevronUp, Database, Edit, Trash2, X, 
     PlusCircle, Tag, Calendar, LogOut, MoreVertical, ArrowLeft, ArrowRight,
-    ClipboardList // Ícone para Planejamento
+    ClipboardList
 } from 'lucide-react';
 
 // Cores para o gráfico e cards
@@ -694,7 +694,16 @@ const AgendaView = ({ reminders, setReminders, phoneNumber }) => {
                           <div>
                               <p className="font-semibold text-gray-800">{reminder.description}</p>
                               <p className="text-sm text-gray-500">
-                                  {new Date(reminder.due_date).toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                  {/* CORREÇÃO APLICADA AQUI */}
+                                  {new Date(reminder.due_date).toLocaleString('pt-BR', { 
+                                      weekday: 'long', 
+                                      year: 'numeric', 
+                                      month: 'long', 
+                                      day: 'numeric', 
+                                      hour: '2-digit', 
+                                      minute: '2-digit',
+                                      timeZone: 'America/Sao_Paulo' 
+                                  })}
                               </p>
                           </div>
                           <div className="flex items-center gap-4">
@@ -924,32 +933,28 @@ const PlanningTable = ({ expenses, year, onStatusChange, onEdit, onDelete }) => 
     );
 };
 
-// --- COMPONENTE ATUALIZADO COM A NOVA LÓGICA DE STATUS ---
 const StatusSelector = ({ expense, month, year, onStatusChange }) => {
     const monthKey = `${year}-${String(month).padStart(2, '0')}`;
-    const actualStatus = expense.statuses?.[monthKey]; // Pode ser 'Pago', 'Pendente', ou undefined
+    const actualStatus = expense.statuses?.[monthKey];
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const endOfMonth = new Date(year, month, 0); // Pega o último dia do mês para a comparação
+    const endOfMonth = new Date(year, month, 0);
 
     let displayStatus;
     let isDisabled = false;
-    const effectiveStatus = actualStatus || 'Pendente'; // O valor do select é sempre 'Pago' ou 'Pendente'
+    const effectiveStatus = actualStatus || 'Pendente';
 
-    if (endOfMonth < today) { // Se o mês inteiro já passou
+    if (endOfMonth < today) {
         if (!actualStatus) {
-            // Se nunca houve um status ('Pago' ou 'Pendente'), significa que não foi lançado
             displayStatus = 'N/A';
             isDisabled = true;
         } else if (actualStatus === 'Pendente') {
-            // Se o status era 'Pendente' e o mês passou, está atrasado
             displayStatus = 'Atrasado';
         } else {
-            // Se o status era 'Pago'
             displayStatus = 'Pago';
         }
-    } else { // Mês atual ou futuro
+    } else {
         displayStatus = actualStatus === 'Pago' ? 'Pago' : 'Pendente';
     }
     
@@ -970,10 +975,7 @@ const StatusSelector = ({ expense, month, year, onStatusChange }) => {
             disabled={isDisabled}
             className={`text-xs font-medium py-1 px-2 rounded-full border appearance-none text-center focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors ${getStatusClasses()}`}
         >
-            {/* A opção visível reflete o status calculado, mas o valor real é mantido */}
             <option value={effectiveStatus} hidden>{displayStatus}</option>
-            
-            {/* Opções reais para o usuário selecionar */}
             <option value="Pago">Pago</option>
             <option value="Pendente">Pendente</option>
         </select>
@@ -1062,6 +1064,7 @@ const PlannedExpenseModal = ({ isOpen, onClose, onSave, expense, error }) => {
         </Modal>
     );
 };
+
 
 const App = () => {
   const [phoneNumber, setPhoneNumber] = useState('');
