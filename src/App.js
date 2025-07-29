@@ -671,18 +671,16 @@ const AgendaView = ({ reminders, setReminders, phoneNumber }) => {
       const form = e.target;
       
       // Pega a string do input (ex: "2025-08-07T15:00").
-      // O JS interpreta essa string como sendo no fuso horário local do navegador.
-      const localDateTimeString = form.elements.due_date.value;
-      const localDate = new Date(localDateTimeString);
+      const naiveDateTimeString = form.elements.due_date.value;
       
       const updatedData = {
           description: form.elements.description.value,
           // ==================================================================
           // ||                      PONTO DA CORREÇÃO                     ||
           // ==================================================================
-          // Converte a data local do navegador para uma string ISO em UTC (com 'Z').
-          // O backend simplesmente salvará este valor UTC.
-          due_date: localDate.toISOString(),
+          // Envia a string "naive" para o backend, que irá aplicar o fuso.
+          // Adicionamos os segundos para manter o formato ISO completo que o backend espera.
+          due_date: naiveDateTimeString + ":00",
       };
 
       try {
