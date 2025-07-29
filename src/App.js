@@ -6,6 +6,9 @@ import {
     PlusCircle, Tag, Calendar, LogOut, MoreVertical, ArrowLeft, ArrowRight,
     ClipboardList
 } from 'lucide-react';
+// Carregando a biblioteca Luxon de um CDN. Em um projeto local, você usaria 'npm install luxon'.
+import { DateTime } from "https://cdn.skypack.dev/luxon@2.3.0";
+
 
 // Cores para o gráfico e cards
 const COLORS = ['#3b82f6', '#10b981', '#f97316', '#ef4444', '#8b5cf6', '#ec4899', '#f59e0b'];
@@ -610,22 +613,11 @@ const AgendaView = ({ reminders, setReminders, phoneNumber }) => {
 
   const formatToLocalDateTime = (isoString) => {
     if (!isoString) return '';
-    const date = new Date(isoString);
-
-    // Usa Intl.DateTimeFormat para obter a data/hora no fuso de São Paulo de forma confiável.
-    // O locale 'sv-SE' (sueco) convenientemente nos dá o formato YYYY-MM-DD HH:mm.
-    const formatter = new Intl.DateTimeFormat('sv-SE', {
-        timeZone: 'America/Sao_Paulo',
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: false,
-    });
-
-    // Formata a data e substitui o espaço por 'T' para o input datetime-local.
-    return formatter.format(date).replace(' ', 'T');
+    // Luxon: Cria um objeto DateTime a partir da string ISO (que está em UTC)
+    // e o converte para o fuso de São Paulo.
+    return DateTime.fromISO(isoString)
+      .setZone('America/Sao_Paulo')
+      .toFormat("yyyy-MM-dd'T'HH:mm");
   };
 
   const handleEdit = (reminder) => {
@@ -670,17 +662,18 @@ const AgendaView = ({ reminders, setReminders, phoneNumber }) => {
       const cleanPhoneNumber = phoneNumber.replace(/\D/g, '');
       const form = e.target;
       
-      // Pega a string do input (ex: "2025-08-07T15:00").
-      const naiveDateTimeString = form.elements.due_date.value;
+      const localDateTimeString = form.elements.due_date.value;
       
+      // Luxon: Cria um objeto DateTime a partir da string do input,
+      // especificando que essa string representa o horário de São Paulo.
+      const localDateTime = DateTime.fromISO(localDateTimeString, { zone: 'America/Sao_Paulo' });
+
+      // Converte o objeto para UTC e depois para uma string ISO.
+      const utcDateTimeString = localDateTime.toUTC().toISO();
+
       const updatedData = {
           description: form.elements.description.value,
-          // ==================================================================
-          // ||                      PONTO DA CORREÇÃO                     ||
-          // ==================================================================
-          // Envia a string "naive" para o backend, que irá aplicar o fuso.
-          // Adicionamos os segundos para manter o formato ISO completo que o backend espera.
-          due_date: naiveDateTimeString + ":00",
+          due_date: utcDateTimeString,
       };
 
       try {
@@ -713,15 +706,7 @@ const AgendaView = ({ reminders, setReminders, phoneNumber }) => {
                           <div>
                               <p className="font-semibold text-gray-800">{reminder.description}</p>
                               <p className="text-sm text-gray-500">
-                                  {new Date(reminder.due_date).toLocaleString('pt-BR', { 
-                                      weekday: 'long', 
-                                      year: 'numeric', 
-                                      month: 'long', 
-                                      day: 'numeric', 
-                                      hour: '2-digit', 
-                                      minute: '2-digit',
-                                      timeZone: 'America/Sao_Paulo' 
-                                  })}
+                                  {DateTime.fromISO(reminder.due_date).setZone('America/Sao_Paulo').toLocaleString(DateTime.DATETIME_FULL)}
                               </p>
                           </div>
                           <div className="flex items-center gap-4">
