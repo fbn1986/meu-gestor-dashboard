@@ -7,7 +7,7 @@ import {
     ClipboardList
 } from 'lucide-react';
 // Carregando a biblioteca Luxon de um CDN. Em um projeto local, você usaria 'npm install luxon'.
-import { DateTime } from "https://cdn.skypack.dev/luxon@2.3.0";
+import { DateTime } from "luxon";
 
 
 // Cores para o gráfico e cards
