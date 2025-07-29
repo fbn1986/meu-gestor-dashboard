@@ -612,6 +612,8 @@ const AgendaView = ({ reminders, setReminders, phoneNumber }) => {
     if (!isoString) return '';
     const date = new Date(isoString);
 
+    // Usa Intl.DateTimeFormat para obter a data/hora no fuso de São Paulo de forma confiável.
+    // O locale 'sv-SE' (sueco) convenientemente nos dá o formato YYYY-MM-DD HH:mm.
     const formatter = new Intl.DateTimeFormat('sv-SE', {
         timeZone: 'America/Sao_Paulo',
         year: 'numeric',
@@ -622,6 +624,7 @@ const AgendaView = ({ reminders, setReminders, phoneNumber }) => {
         hour12: false,
     });
 
+    // Formata a data e substitui o espaço por 'T' para o input datetime-local.
     return formatter.format(date).replace(' ', 'T');
   };
 
@@ -667,16 +670,19 @@ const AgendaView = ({ reminders, setReminders, phoneNumber }) => {
       const cleanPhoneNumber = phoneNumber.replace(/\D/g, '');
       const form = e.target;
       
-      const naiveDateTimeString = form.elements.due_date.value;
+      // Pega a string do input (ex: "2025-08-07T15:00").
+      // O JS interpreta essa string como sendo no fuso horário local do navegador.
+      const localDateTimeString = form.elements.due_date.value;
+      const localDate = new Date(localDateTimeString);
       
       const updatedData = {
           description: form.elements.description.value,
           // ==================================================================
           // ||                      PONTO DA CORREÇÃO                     ||
           // ==================================================================
-          // Envia a string "naive" (ex: "2025-08-07T15:00") para o backend.
-          // O backend irá interpretar isso como horário de SP e converter para UTC.
-          due_date: naiveDateTimeString + ":00",
+          // Converte a data local do navegador para uma string ISO em UTC (com 'Z').
+          // O backend simplesmente salvará este valor UTC.
+          due_date: localDate.toISOString(),
       };
 
       try {
