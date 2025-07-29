@@ -6,7 +6,7 @@ import {
     PlusCircle, Tag, Calendar, LogOut, MoreVertical, ArrowLeft, ArrowRight,
     ClipboardList
 } from 'lucide-react';
-// Carregando a biblioteca Luxon de um CDN. Em um projeto local, você usaria 'npm install luxon'.
+// CORREÇÃO: Alterado para importar a biblioteca localmente.
 import { DateTime } from "luxon";
 
 
