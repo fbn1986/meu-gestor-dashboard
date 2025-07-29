@@ -395,7 +395,11 @@ const TabelaTransacoesView = ({ transactions, setTransactions, phoneNumber, cate
                   <tbody>
                       {filteredTransactions.map(t => (
                           <tr key={`${t.type}-${t.id}`} className={`border-b ${t.type === 'income' ? 'bg-green-50' : 'bg-red-50'}`}>
-                              <td className="px-6 py-4">{new Date(t.date).toLocaleDateString('pt-BR')}</td>
+                              {/* ================================================================== */}
+                              {/* ||                      PONTO DA CORREÇÃO                     || */}
+                              {/* ================================================================== */}
+                              {/* Adicionado timeZone para garantir que a data seja exibida no fuso correto. */}
+                              <td className="px-6 py-4">{new Date(t.date).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })}</td>
                               <td className="px-6 py-4 font-medium text-gray-900">{t.description}</td>
                               <td className="px-6 py-4">{t.category || 'N/A'}</td>
                               <td className={`px-6 py-4 font-bold ${t.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>
@@ -548,10 +552,10 @@ const GerenciarCategoriasView = ({ categories, setCategories, phoneNumber }) => 
           <p className="text-sm text-gray-600 mb-6">A IA é capaz de identificar categorias automaticamente. No entanto, se preferir, você pode personalizar as categorias de acordo com suas necessidades.</p>
           
           <div className="mb-6">
-               <button onClick={() => openModal('create')} className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition flex items-center">
-                   <PlusCircle size={18} className="mr-2"/>
-                   Crie sua categoria
-               </button>
+              <button onClick={() => openModal('create')} className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition flex items-center">
+                  <PlusCircle size={18} className="mr-2"/>
+                  Crie sua categoria
+              </button>
           </div>
 
           <div className="space-y-3">
@@ -563,14 +567,14 @@ const GerenciarCategoriasView = ({ categories, setCategories, phoneNumber }) => 
                           {cat.is_default && <span className="text-xs bg-gray-200 text-gray-600 px-2 py-1 rounded-full ml-3">Padrão</span>}
                       </div>
                       {!cat.is_default && (
-                           <div className="flex items-center gap-4">
-                               <button onClick={() => openModal('edit', cat)} className="text-sm text-blue-600 hover:text-blue-800 flex items-center gap-1">
-                                   <Edit size={14}/> Editar
-                               </button>
-                               <button onClick={() => handleDelete(cat)} className="text-sm text-red-600 hover:text-red-800 flex items-center gap-1">
-                                   <Trash2 size={14}/> Excluir
-                               </button>
-                           </div>
+                          <div className="flex items-center gap-4">
+                              <button onClick={() => openModal('edit', cat)} className="text-sm text-blue-600 hover:text-blue-800 flex items-center gap-1">
+                                  <Edit size={14}/> Editar
+                              </button>
+                              <button onClick={() => handleDelete(cat)} className="text-sm text-red-600 hover:text-red-800 flex items-center gap-1">
+                                  <Trash2 size={14}/> Excluir
+                              </button>
+                          </div>
                       )}
                   </div>
               ))}
@@ -700,7 +704,7 @@ const AgendaView = ({ reminders, setReminders, phoneNumber }) => {
                           <div>
                               <p className="font-semibold text-gray-800">{reminder.description}</p>
                               <p className="text-sm text-gray-500">
-                                  {/* CORREÇÃO APLICADA AQUI */}
+                                  {/* Este trecho já estava correto, usando timeZone para formatar. */}
                                   {new Date(reminder.due_date).toLocaleString('pt-BR', { 
                                       weekday: 'long', 
                                       year: 'numeric', 
