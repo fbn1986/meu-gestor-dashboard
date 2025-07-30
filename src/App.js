@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { formatarDataBRT, formatarDataHoraBRT, dataIsoParaInputLocal } from './utils/data';
 import { PieChart, Pie, Cell, ResponsiveContainer, Sector } from 'recharts';
 import { 
     Search, Loader, AlertCircle, TrendingUp, TrendingDown, DollarSign, Wallet, 
@@ -398,7 +399,7 @@ const TabelaTransacoesView = ({ transactions, setTransactions, phoneNumber, cate
                   <tbody>
                       {filteredTransactions.map(t => (
                           <tr key={`${t.type}-${t.id}`} className={`border-b ${t.type === 'income' ? 'bg-green-50' : 'bg-red-50'}`}>
-                              <td className="px-6 py-4">{new Date(t.date).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })}</td>
+                              <td className="px-6 py-4">{formatarDataBRT(t.date)}</td>
                               <td className="px-6 py-4 font-medium text-gray-900">{t.description}</td>
                               <td className="px-6 py-4">{t.category || 'N/A'}</td>
                               <td className={`px-6 py-4 font-bold ${t.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>
@@ -611,14 +612,8 @@ const AgendaView = ({ reminders, setReminders, phoneNumber }) => {
   
   const API_BASE_URL = 'https://meu-gestor-fernando.onrender.com';
 
-  const formatToLocalDateTime = (isoString) => {
-    if (!isoString) return '';
-    // Luxon: Cria um objeto DateTime a partir da string ISO (que está em UTC)
-    // e o converte para o fuso de São Paulo.
-    return DateTime.fromISO(isoString)
-      .setZone('America/Sao_Paulo')
-      .toFormat("yyyy-MM-dd'T'HH:mm");
-  };
+  // Já está importando dataIsoParaInputLocal do utils/data.js
+
 
   const handleEdit = (reminder) => {
       setModalError(null);
@@ -706,7 +701,7 @@ const AgendaView = ({ reminders, setReminders, phoneNumber }) => {
                           <div>
                               <p className="font-semibold text-gray-800">{reminder.description}</p>
                               <p className="text-sm text-gray-500">
-                                  {DateTime.fromISO(reminder.due_date).setZone('America/Sao_Paulo').toLocaleString(DateTime.DATETIME_FULL)}
+                                  {formatarDataHoraBRT(reminder.due_date)}
                               </p>
                           </div>
                           <div className="flex items-center gap-4">
@@ -730,7 +725,7 @@ const AgendaView = ({ reminders, setReminders, phoneNumber }) => {
                       </div>
                       <div className="mb-4">
                           <label className="block text-sm font-medium text-gray-700 mb-1">Data e Hora</label>
-                          <input type="datetime-local" name="due_date" defaultValue={formatToLocalDateTime(selectedReminder.due_date)} className="p-2 border rounded-md w-full" required />
+                          <input type="datetime-local" name="due_date" defaultValue={dataIsoParaInputLocal(selectedReminder.due_date)} className="p-2 border rounded-md w-full" required />
                       </div>
                       <div className="flex justify-end gap-3 mt-6">
                           <button type="button" onClick={() => setIsEditModalOpen(false)} className="bg-gray-200 text-gray-800 px-4 py-2 rounded-md hover:bg-gray-300">Cancelar</button>
