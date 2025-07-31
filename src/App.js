@@ -4,10 +4,10 @@ import {
     Search, Loader, AlertCircle, TrendingUp, TrendingDown, DollarSign, Wallet, 
     LayoutDashboard, List, ChevronDown, ChevronUp, Database, Edit, Trash2, X, 
     PlusCircle, Tag, Calendar, LogOut, MoreVertical, ArrowLeft, ArrowRight,
-    ClipboardList, Clock, Briefcase, Coffee
+    ClipboardList, Clock, Briefcase, Coffee, BarChart2
 } from 'lucide-react';
 // Importando a biblioteca Luxon que foi instalada localmente via npm.
-import { DateTime, Duration } from "luxon";
+import { DateTime, Duration, Interval } from "luxon";
 
 
 // Cores para o gráfico e cards
@@ -182,39 +182,130 @@ const VisaoGeralView = ({ stats }) => (
 );
 
 // NOVO COMPONENTE PARA A TELA DE PONTO
-const PontoView = ({ timeLogs }) => {
+const PontoView = ({ timeLogs, setTimeLogs, phoneNumber }) => {
     const timeZone = 'America/Sao_Paulo';
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [selectedLog, setSelectedLog] = useState(null);
+    const [modalError, setModalError] = useState('');
+    const [startDate, setStartDate] = useState(DateTime.now().setZone(timeZone).startOf('month').toISODate());
+    const [endDate, setEndDate] = useState(DateTime.now().setZone(timeZone).endOf('month').toISODate());
+    const API_BASE_URL = 'https://meu-gestor-fernando.onrender.com';
+
+    const formatDuration = (duration) => {
+        if (!duration || !duration.isValid) return "0h 0min";
+        return duration.toFormat("hh'h' mm'min'");
+    };
 
     const stats = useMemo(() => {
         let totalToday = Duration.fromMillis(0);
         let totalWeek = Duration.fromMillis(0);
         let totalMonth = Duration.fromMillis(0);
-
         const now = DateTime.now().setZone(timeZone);
         
         timeLogs.forEach(log => {
-            const clockIn = DateTime.fromISO(log.clock_in).setZone(timeZone);
             if (!log.clock_out) return;
+            const clockIn = DateTime.fromISO(log.clock_in).setZone(timeZone);
             const clockOut = DateTime.fromISO(log.clock_out).setZone(timeZone);
             const duration = clockOut.diff(clockIn);
 
-            if (clockIn.hasSame(now, 'day')) {
-                totalToday = totalToday.plus(duration);
-            }
-            if (clockIn.hasSame(now, 'week')) {
-                totalWeek = totalWeek.plus(duration);
-            }
-            if (clockIn.hasSame(now, 'month')) {
-                totalMonth = totalMonth.plus(duration);
-            }
+            if (clockIn.hasSame(now, 'day')) totalToday = totalToday.plus(duration);
+            if (clockIn.hasSame(now, 'week')) totalWeek = totalWeek.plus(duration);
+            if (clockIn.hasSame(now, 'month')) totalMonth = totalMonth.plus(duration);
         });
 
         return {
-            today: totalToday.toFormat("hh'h' mm'min'"),
-            week: totalWeek.toFormat("hh'h' mm'min'"),
-            month: totalMonth.toFormat("hh'h' mm'min'")
+            today: formatDuration(totalToday),
+            week: formatDuration(totalWeek),
+            month: formatDuration(totalMonth)
         };
     }, [timeLogs]);
+
+    const report = useMemo(() => {
+        if (!startDate || !endDate) return null;
+        
+        const start = DateTime.fromISO(startDate).startOf('day');
+        const end = DateTime.fromISO(endDate).endOf('day');
+        if (start > end) return { worked: '0h 0min', expected: '0h 0min', balance: '0h 0min', balanceColor: 'text-gray-800'};
+
+        let workedDuration = Duration.fromMillis(0);
+        let expectedWorkDays = 0;
+
+        const interval = Interval.fromDateTimes(start, end);
+
+        timeLogs.forEach(log => {
+            if (!log.clock_out) return;
+            const clockIn = DateTime.fromISO(log.clock_in);
+            if (interval.contains(clockIn)) {
+                const clockOut = DateTime.fromISO(log.clock_out);
+                workedDuration = workedDuration.plus(clockOut.diff(clockIn));
+            }
+        });
+        
+        let currentDate = start;
+        while(currentDate <= end) {
+            // Conta apenas dias de semana (1=Segunda, 7=Domingo)
+            if (currentDate.weekday >= 1 && currentDate.weekday <= 5) {
+                expectedWorkDays++;
+            }
+            currentDate = currentDate.plus({ days: 1 });
+        }
+
+        const expectedDuration = Duration.fromObject({ hours: expectedWorkDays * 8 });
+        const balanceDuration = workedDuration.minus(expectedDuration);
+
+        return {
+            worked: formatDuration(workedDuration.normalize()),
+            expected: formatDuration(expectedDuration.normalize()),
+            balance: formatDuration(balanceDuration.normalize()),
+            balanceColor: balanceDuration.as('milliseconds') >= 0 ? 'text-green-600' : 'text-red-600'
+        }
+    }, [timeLogs, startDate, endDate]);
+
+    const handleEdit = (log) => {
+        setSelectedLog(log);
+        setModalError('');
+        setIsEditModalOpen(true);
+    };
+
+    const handleUpdate = async (e) => {
+        e.preventDefault();
+        if (!selectedLog) return;
+        
+        const form = e.target;
+        const clockInStr = form.elements.clock_in.value;
+        const clockOutStr = form.elements.clock_out.value;
+
+        // Validação básica
+        if (!clockInStr) {
+            setModalError("A hora de entrada é obrigatória.");
+            return;
+        }
+        if (clockOutStr && new Date(clockOutStr) < new Date(clockInStr)) {
+            setModalError("A hora de saída não pode ser anterior à hora de entrada.");
+            return;
+        }
+
+        const clockInUTC = DateTime.fromISO(clockInStr, { zone: timeZone }).toUTC().toISO();
+        const clockOutUTC = clockOutStr ? DateTime.fromISO(clockOutStr, { zone: timeZone }).toUTC().toISO() : null;
+        
+        const cleanPhoneNumber = phoneNumber.replace(/\D/g, '');
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/ponto/${selectedLog.id}?phone_number=${cleanPhoneNumber}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ clock_in: clockInUTC, clock_out: clockOutUTC }),
+            });
+            if (!response.ok) {
+                const errData = await response.json();
+                throw new Error(errData.detail || 'Falha ao atualizar o registro.');
+            }
+            const updatedLog = await response.json();
+            setTimeLogs(prev => prev.map(log => log.id === updatedLog.id ? updatedLog : log));
+            setIsEditModalOpen(false);
+        } catch (err) {
+            setModalError(err.message);
+        }
+    };
 
     const latestLog = timeLogs?.[0];
     const isWorking = latestLog && !latestLog.clock_out;
@@ -243,6 +334,27 @@ const PontoView = ({ timeLogs }) => {
             </div>
 
             <div className="bg-white p-6 rounded-lg shadow">
+                <h3 className="text-lg font-semibold text-gray-800 mb-4">Relatório por Período</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Data de Início</label>
+                        <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="p-2 border rounded-md w-full" />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Data de Fim</label>
+                        <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="p-2 border rounded-md w-full" />
+                    </div>
+                </div>
+                {report && (
+                    <div className="flex flex-col sm:flex-row gap-4 sm:gap-6">
+                        <StatCard title="Total Trabalhado" value={report.worked} icon={<BarChart2 size={24} className="text-gray-600"/>} colorClass="bg-gray-100"/>
+                        <StatCard title="Total Esperado (8h/dia útil)" value={report.expected} icon={<Calendar size={24} className="text-gray-600"/>} colorClass="bg-gray-100"/>
+                        <StatCard title="Saldo de Horas" value={report.balance} icon={<TrendingUp size={24} className={report.balanceColor}/>} colorClass="bg-gray-100"/>
+                    </div>
+                )}
+            </div>
+
+            <div className="bg-white p-6 rounded-lg shadow">
                 <h3 className="text-lg font-semibold text-gray-800 mb-4">Registros de Ponto</h3>
                 <div className="overflow-x-auto">
                     <table className="w-full text-sm text-left text-gray-500">
@@ -252,6 +364,7 @@ const PontoView = ({ timeLogs }) => {
                                 <th scope="col" className="px-6 py-3">Entrada</th>
                                 <th scope="col" className="px-6 py-3">Saída</th>
                                 <th scope="col" className="px-6 py-3">Duração</th>
+                                <th scope="col" className="px-6 py-3">Ações</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -265,6 +378,9 @@ const PontoView = ({ timeLogs }) => {
                                         <td className="px-6 py-4 text-green-600 font-semibold">{clockIn.toFormat('HH:mm')}</td>
                                         <td className="px-6 py-4 text-red-600 font-semibold">{clockOut ? clockOut.toFormat('HH:mm') : '...'}</td>
                                         <td className="px-6 py-4">{duration ? `${Math.floor(duration.hours)}h ${Math.floor(duration.minutes)}min` : '-'}</td>
+                                        <td className="px-6 py-4">
+                                            <button onClick={() => handleEdit(log)} className="text-blue-600 hover:text-blue-800"><Edit size={16} /></button>
+                                        </td>
                                     </tr>
                                 )
                             })}
@@ -273,10 +389,29 @@ const PontoView = ({ timeLogs }) => {
                 </div>
                 {timeLogs.length === 0 && <p className="text-center text-gray-500 mt-6">Nenhum registro de ponto encontrado.</p>}
             </div>
+
+            <Modal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} title="Editar Registro de Ponto">
+                {selectedLog && (
+                    <form onSubmit={handleUpdate}>
+                        {modalError && <div className="bg-red-100 text-red-700 p-3 rounded-md mb-4 text-sm">{modalError}</div>}
+                        <div className="mb-4">
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Entrada</label>
+                            <input type="datetime-local" name="clock_in" defaultValue={DateTime.fromISO(selectedLog.clock_in).setZone(timeZone).toFormat("yyyy-MM-dd'T'HH:mm")} className="p-2 border rounded-md w-full" required />
+                        </div>
+                        <div className="mb-4">
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Saída</label>
+                            <input type="datetime-local" name="clock_out" defaultValue={selectedLog.clock_out ? DateTime.fromISO(selectedLog.clock_out).setZone(timeZone).toFormat("yyyy-MM-dd'T'HH:mm") : ''} className="p-2 border rounded-md w-full" />
+                        </div>
+                        <div className="flex justify-end gap-3 mt-6">
+                            <button type="button" onClick={() => setIsEditModalOpen(false)} className="bg-gray-200 text-gray-800 px-4 py-2 rounded-md hover:bg-gray-300">Cancelar</button>
+                            <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">Salvar</button>
+                        </div>
+                    </form>
+                )}
+            </Modal>
         </div>
     );
 };
-
 
 const CategoriasView = ({ expensesGrouped }) => {
     const [expandedCategory, setExpandedCategory] = useState(null);
@@ -717,8 +852,6 @@ const AgendaView = ({ reminders, setReminders, phoneNumber }) => {
 
   const formatToLocalDateTime = (isoString) => {
     if (!isoString) return '';
-    // Luxon: Cria um objeto DateTime a partir da string ISO (que está em UTC)
-    // e o converte para o fuso de São Paulo.
     return DateTime.fromISO(isoString)
       .setZone('America/Sao_Paulo')
       .toFormat("yyyy-MM-dd'T'HH:mm");
@@ -767,12 +900,7 @@ const AgendaView = ({ reminders, setReminders, phoneNumber }) => {
       const form = e.target;
       
       const localDateTimeString = form.elements.due_date.value;
-      
-      // Luxon: Cria um objeto DateTime a partir da string do input,
-      // especificando que essa string representa o horário de São Paulo.
       const localDateTime = DateTime.fromISO(localDateTimeString, { zone: 'America/Sao_Paulo' });
-
-      // Converte o objeto para UTC e depois para uma string ISO.
       const utcDateTimeString = localDateTime.toUTC().toISO();
 
       const updatedData = {
@@ -1180,7 +1308,7 @@ const App = () => {
   const [categories, setCategories] = useState([]);
   const [reminders, setReminders] = useState([]);
   const [plannedExpenses, setPlannedExpenses] = useState([]);
-  const [timeLogs, setTimeLogs] = useState([]); // NOVO ESTADO PARA PONTO
+  const [timeLogs, setTimeLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [activeView, setActiveView] = useState('visaoGeral');
@@ -1205,7 +1333,7 @@ const App = () => {
       setCategories(result.categories || []);
       setReminders(result.reminders || []);
       setPlannedExpenses(result.planned_expenses || []);
-      setTimeLogs(result.time_logs || []); // CARREGA OS DADOS DO PONTO
+      setTimeLogs(result.time_logs || []);
     } catch (err) {
       setError(err.message);
       localStorage.removeItem('meuGestorNumero'); 
@@ -1222,7 +1350,7 @@ const App = () => {
     setCategories([]);
     setReminders([]);
     setPlannedExpenses([]);
-    setTimeLogs([]); // LIMPA OS DADOS DO PONTO
+    setTimeLogs([]);
     setError(null);
     setActiveView('visaoGeral');
   };
@@ -1345,7 +1473,7 @@ const App = () => {
         {processedData && (
           <>
             {activeView === 'visaoGeral' && <VisaoGeralView stats={processedData} />}
-            {activeView === 'ponto' && <PontoView timeLogs={timeLogs} />}
+            {activeView === 'ponto' && <PontoView timeLogs={timeLogs} setTimeLogs={setTimeLogs} phoneNumber={phoneNumber} />}
             {activeView === 'categorias' && <CategoriasView expensesGrouped={processedData.expensesGrouped} />}
             {activeView === 'tabela' && <TabelaTransacoesView transactions={allTransactions} setTransactions={setAllTransactions} phoneNumber={phoneNumber} categories={categories} setCategories={setCategories} />}
             {activeView === 'gerenciarCategorias' && <GerenciarCategoriasView categories={categories} setCategories={setCategories} phoneNumber={phoneNumber} />}
