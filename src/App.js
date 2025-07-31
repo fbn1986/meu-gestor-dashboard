@@ -4,7 +4,7 @@ import {
     Search, Loader, AlertCircle, TrendingUp, TrendingDown, DollarSign, Wallet, 
     LayoutDashboard, List, ChevronDown, ChevronUp, Database, Edit, Trash2, X, 
     PlusCircle, Tag, Calendar, LogOut, MoreVertical, ArrowLeft, ArrowRight,
-    ClipboardList
+    ClipboardList, Clock
 } from 'lucide-react';
 // Importando a biblioteca Luxon que foi instalada localmente via npm.
 import { DateTime } from "luxon";
@@ -59,6 +59,13 @@ const Header = ({ onFetch, loading, phoneNumber, setPhoneNumber, activeView, set
             className={`py-3 px-1 text-sm font-medium border-b-2 flex items-center gap-2 whitespace-nowrap ${activeView === 'visaoGeral' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
             >
             <LayoutDashboard size={16} /> Visão Geral
+            </button>
+            {/* NOVO BOTÃO DE NAVEGAÇÃO */}
+            <button 
+            onClick={() => setActiveView('ponto')}
+            className={`py-3 px-1 text-sm font-medium border-b-2 flex items-center gap-2 whitespace-nowrap ${activeView === 'ponto' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
+            >
+            <Clock size={16} /> Registro de Ponto
             </button>
             <button 
             onClick={() => setActiveView('planejamento')}
@@ -1076,6 +1083,7 @@ const App = () => {
   const [categories, setCategories] = useState([]);
   const [reminders, setReminders] = useState([]);
   const [plannedExpenses, setPlannedExpenses] = useState([]);
+  const [timeLogs, setTimeLogs] = useState([]); // NOVO ESTADO PARA PONTO
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [activeView, setActiveView] = useState('visaoGeral');
@@ -1100,6 +1108,7 @@ const App = () => {
       setCategories(result.categories || []);
       setReminders(result.reminders || []);
       setPlannedExpenses(result.planned_expenses || []);
+      setTimeLogs(result.time_logs || []); // CARREGA OS DADOS DO PONTO
     } catch (err) {
       setError(err.message);
       localStorage.removeItem('meuGestorNumero'); 
@@ -1116,6 +1125,7 @@ const App = () => {
     setCategories([]);
     setReminders([]);
     setPlannedExpenses([]);
+    setTimeLogs([]); // LIMPA OS DADOS DO PONTO
     setError(null);
     setActiveView('visaoGeral');
   };
@@ -1238,6 +1248,7 @@ const App = () => {
         {processedData && (
           <>
             {activeView === 'visaoGeral' && <VisaoGeralView stats={processedData} />}
+            {activeView === 'ponto' && <p>Em breve...</p>} {/* Placeholder para a nova tela */}
             {activeView === 'categorias' && <CategoriasView expensesGrouped={processedData.expensesGrouped} />}
             {activeView === 'tabela' && <TabelaTransacoesView transactions={allTransactions} setTransactions={setAllTransactions} phoneNumber={phoneNumber} categories={categories} setCategories={setCategories} />}
             {activeView === 'gerenciarCategorias' && <GerenciarCategoriasView categories={categories} setCategories={setCategories} phoneNumber={phoneNumber} />}
