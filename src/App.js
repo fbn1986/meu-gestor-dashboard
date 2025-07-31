@@ -181,10 +181,10 @@ const VisaoGeralView = ({ stats }) => (
     </div>
 );
 
-// NOVO COMPONENTE PARA A TELA DE PONTO
 const PontoView = ({ timeLogs, setTimeLogs, phoneNumber }) => {
     const timeZone = 'America/Sao_Paulo';
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [selectedLog, setSelectedLog] = useState(null);
     const [modalError, setModalError] = useState('');
     const [startDate, setStartDate] = useState(DateTime.now().setZone(timeZone).startOf('month').toISODate());
@@ -193,7 +193,9 @@ const PontoView = ({ timeLogs, setTimeLogs, phoneNumber }) => {
 
     const formatDuration = (duration) => {
         if (!duration || !duration.isValid) return "0h 0min";
-        return duration.toFormat("hh'h' mm'min'");
+        const hours = Math.floor(duration.as('hours'));
+        const minutes = Math.floor(duration.as('minutes') % 60);
+        return `${hours}h ${minutes}min`;
     };
 
     const stats = useMemo(() => {
@@ -243,7 +245,6 @@ const PontoView = ({ timeLogs, setTimeLogs, phoneNumber }) => {
         
         let currentDate = start;
         while(currentDate <= end) {
-            // Conta apenas dias de semana (1=Segunda, 7=Domingo)
             if (currentDate.weekday >= 1 && currentDate.weekday <= 5) {
                 expectedWorkDays++;
             }
@@ -253,10 +254,13 @@ const PontoView = ({ timeLogs, setTimeLogs, phoneNumber }) => {
         const expectedDuration = Duration.fromObject({ hours: expectedWorkDays * 8 });
         const balanceDuration = workedDuration.minus(expectedDuration);
 
+        const balanceSign = balanceDuration.as('milliseconds') < 0 ? '-' : '+';
+        const formattedBalance = formatDuration(balanceDuration.abs());
+
         return {
             worked: formatDuration(workedDuration.normalize()),
             expected: formatDuration(expectedDuration.normalize()),
-            balance: formatDuration(balanceDuration.normalize()),
+            balance: `${balanceSign}${formattedBalance}`,
             balanceColor: balanceDuration.as('milliseconds') >= 0 ? 'text-green-600' : 'text-red-600'
         }
     }, [timeLogs, startDate, endDate]);
@@ -267,6 +271,29 @@ const PontoView = ({ timeLogs, setTimeLogs, phoneNumber }) => {
         setIsEditModalOpen(true);
     };
 
+    const handleDelete = (log) => {
+        setSelectedLog(log);
+        setIsDeleteModalOpen(true);
+    };
+
+    const confirmDelete = async () => {
+        if (!selectedLog) return;
+        const cleanPhoneNumber = phoneNumber.replace(/\D/g, '');
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/ponto/${selectedLog.id}?phone_number=${cleanPhoneNumber}`, {
+                method: 'DELETE',
+            });
+            if (!response.ok) {
+                const errData = await response.json();
+                throw new Error(errData.detail || 'Falha ao apagar o registro.');
+            }
+            setTimeLogs(prev => prev.filter(log => log.id !== selectedLog.id));
+            setIsDeleteModalOpen(false);
+        } catch (err) {
+            alert(err.message);
+        }
+    };
+
     const handleUpdate = async (e) => {
         e.preventDefault();
         if (!selectedLog) return;
@@ -275,7 +302,6 @@ const PontoView = ({ timeLogs, setTimeLogs, phoneNumber }) => {
         const clockInStr = form.elements.clock_in.value;
         const clockOutStr = form.elements.clock_out.value;
 
-        // Validação básica
         if (!clockInStr) {
             setModalError("A hora de entrada é obrigatória.");
             return;
@@ -300,7 +326,7 @@ const PontoView = ({ timeLogs, setTimeLogs, phoneNumber }) => {
                 throw new Error(errData.detail || 'Falha ao atualizar o registro.');
             }
             const updatedLog = await response.json();
-            setTimeLogs(prev => prev.map(log => log.id === updatedLog.id ? updatedLog : log));
+            setTimeLogs(prev => prev.map(log => log.id === updatedLog.id ? updatedLog : log).sort((a, b) => new Date(b.clock_in) - new Date(a.clock_in)));
             setIsEditModalOpen(false);
         } catch (err) {
             setModalError(err.message);
@@ -378,8 +404,9 @@ const PontoView = ({ timeLogs, setTimeLogs, phoneNumber }) => {
                                         <td className="px-6 py-4 text-green-600 font-semibold">{clockIn.toFormat('HH:mm')}</td>
                                         <td className="px-6 py-4 text-red-600 font-semibold">{clockOut ? clockOut.toFormat('HH:mm') : '...'}</td>
                                         <td className="px-6 py-4">{duration ? `${Math.floor(duration.hours)}h ${Math.floor(duration.minutes)}min` : '-'}</td>
-                                        <td className="px-6 py-4">
+                                        <td className="px-6 py-4 flex items-center gap-3">
                                             <button onClick={() => handleEdit(log)} className="text-blue-600 hover:text-blue-800"><Edit size={16} /></button>
+                                            <button onClick={() => handleDelete(log)} className="text-red-600 hover:text-red-800"><Trash2 size={16} /></button>
                                         </td>
                                     </tr>
                                 )
@@ -407,6 +434,18 @@ const PontoView = ({ timeLogs, setTimeLogs, phoneNumber }) => {
                             <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">Salvar</button>
                         </div>
                     </form>
+                )}
+            </Modal>
+            
+            <Modal isOpen={isDeleteModalOpen} onClose={() => setIsDeleteModalOpen(false)} title="Confirmar Exclusão">
+                {selectedLog && (
+                    <div>
+                        <p className="text-gray-700 mb-6">Tem certeza que deseja apagar este registro de ponto?</p>
+                        <div className="flex justify-end gap-3">
+                            <button type="button" onClick={() => setIsDeleteModalOpen(false)} className="bg-gray-200 text-gray-800 px-4 py-2 rounded-md hover:bg-gray-300">Cancelar</button>
+                            <button type="button" onClick={confirmDelete} className="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700">Apagar</button>
+                        </div>
+                    </div>
                 )}
             </Modal>
         </div>
