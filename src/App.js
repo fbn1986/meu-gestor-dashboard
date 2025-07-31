@@ -4,10 +4,10 @@ import {
     Search, Loader, AlertCircle, TrendingUp, TrendingDown, DollarSign, Wallet, 
     LayoutDashboard, List, ChevronDown, ChevronUp, Database, Edit, Trash2, X, 
     PlusCircle, Tag, Calendar, LogOut, MoreVertical, ArrowLeft, ArrowRight,
-    ClipboardList, Clock
+    ClipboardList, Clock, Briefcase, Coffee
 } from 'lucide-react';
 // Importando a biblioteca Luxon que foi instalada localmente via npm.
-import { DateTime } from "luxon";
+import { DateTime, Duration } from "luxon";
 
 
 // Cores para o gráfico e cards
@@ -60,7 +60,6 @@ const Header = ({ onFetch, loading, phoneNumber, setPhoneNumber, activeView, set
             >
             <LayoutDashboard size={16} /> Visão Geral
             </button>
-            {/* NOVO BOTÃO DE NAVEGAÇÃO */}
             <button 
             onClick={() => setActiveView('ponto')}
             className={`py-3 px-1 text-sm font-medium border-b-2 flex items-center gap-2 whitespace-nowrap ${activeView === 'ponto' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
@@ -103,7 +102,7 @@ const Header = ({ onFetch, loading, phoneNumber, setPhoneNumber, activeView, set
   </header>
 );
 
-const StatCard = ({ title, value, icon, colorClass }) => (
+const StatCard = ({ title, value, icon, colorClass, subValue }) => (
     <div className="bg-white p-4 rounded-lg shadow flex-1">
       <div className="flex items-center">
         <div className={`p-2 rounded-lg mr-4 ${colorClass}`}>
@@ -111,7 +110,8 @@ const StatCard = ({ title, value, icon, colorClass }) => (
         </div>
         <div>
           <p className="text-sm text-gray-500">{title}</p>
-          <p className="text-xl font-bold text-gray-800">R$ {value.toFixed(2).replace('.', ',')}</p>
+          <p className="text-xl font-bold text-gray-800">{value}</p>
+          {subValue && <p className="text-xs text-gray-400">{subValue}</p>}
         </div>
       </div>
     </div>
@@ -155,9 +155,9 @@ const CategoryDetails = ({ data, total }) => (
 const VisaoGeralView = ({ stats }) => (
     <div className="space-y-8">
         <div className="flex flex-col sm:flex-row gap-4 sm:gap-6">
-            <StatCard title="Receitas" value={stats.totalIncome} icon={<TrendingUp size={24} className="text-green-600"/>} colorClass="bg-green-100"/>
-            <StatCard title="Despesas" value={stats.totalExpense} icon={<TrendingDown size={24} className="text-red-600"/>} colorClass="bg-red-100"/>
-            <StatCard title="Balanço" value={stats.balance} icon={<DollarSign size={24} className="text-blue-600"/>} colorClass="bg-blue-100"/>
+            <StatCard title="Receitas" value={`R$ ${stats.totalIncome.toFixed(2).replace('.', ',')}`} icon={<TrendingUp size={24} className="text-green-600"/>} colorClass="bg-green-100"/>
+            <StatCard title="Despesas" value={`R$ ${stats.totalExpense.toFixed(2).replace('.', ',')}`} icon={<TrendingDown size={24} className="text-red-600"/>} colorClass="bg-red-100"/>
+            <StatCard title="Balanço" value={`R$ ${stats.balance.toFixed(2).replace('.', ',')}`} icon={<DollarSign size={24} className="text-blue-600"/>} colorClass="bg-blue-100"/>
         </div>
         <div className="bg-white p-6 rounded-lg shadow">
             <h3 className="text-lg font-semibold text-gray-800 mb-4">Despesas por Categoria</h3>
@@ -180,6 +180,103 @@ const VisaoGeralView = ({ stats }) => (
         </div>
     </div>
 );
+
+// NOVO COMPONENTE PARA A TELA DE PONTO
+const PontoView = ({ timeLogs }) => {
+    const timeZone = 'America/Sao_Paulo';
+
+    const stats = useMemo(() => {
+        let totalToday = Duration.fromMillis(0);
+        let totalWeek = Duration.fromMillis(0);
+        let totalMonth = Duration.fromMillis(0);
+
+        const now = DateTime.now().setZone(timeZone);
+        
+        timeLogs.forEach(log => {
+            const clockIn = DateTime.fromISO(log.clock_in).setZone(timeZone);
+            if (!log.clock_out) return;
+            const clockOut = DateTime.fromISO(log.clock_out).setZone(timeZone);
+            const duration = clockOut.diff(clockIn);
+
+            if (clockIn.hasSame(now, 'day')) {
+                totalToday = totalToday.plus(duration);
+            }
+            if (clockIn.hasSame(now, 'week')) {
+                totalWeek = totalWeek.plus(duration);
+            }
+            if (clockIn.hasSame(now, 'month')) {
+                totalMonth = totalMonth.plus(duration);
+            }
+        });
+
+        return {
+            today: totalToday.toFormat("hh'h' mm'min'"),
+            week: totalWeek.toFormat("hh'h' mm'min'"),
+            month: totalMonth.toFormat("hh'h' mm'min'")
+        };
+    }, [timeLogs]);
+
+    const latestLog = timeLogs?.[0];
+    const isWorking = latestLog && !latestLog.clock_out;
+
+    return (
+        <div className="space-y-8">
+            <div className={`p-6 rounded-lg shadow-md ${isWorking ? 'bg-blue-50' : 'bg-green-50'}`}>
+                <div className="flex items-center">
+                    {isWorking ? <Briefcase className="text-blue-600 mr-4" size={32}/> : <Coffee className="text-green-600 mr-4" size={32}/>}
+                    <div>
+                        <p className="text-lg font-semibold">{isWorking ? "Você está trabalhando" : "Fora de expediente"}</p>
+                        <p className="text-sm text-gray-600">
+                            {isWorking 
+                                ? `Entrada registrada às ${DateTime.fromISO(latestLog.clock_in).setZone(timeZone).toFormat('HH:mm')}`
+                                : "Bata o ponto pelo WhatsApp para iniciar um novo registro."
+                            }
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-4 sm:gap-6">
+                <StatCard title="Horas Hoje" value={stats.today} icon={<Clock size={24} className="text-indigo-600"/>} colorClass="bg-indigo-100"/>
+                <StatCard title="Horas na Semana" value={stats.week} icon={<Clock size={24} className="text-yellow-600"/>} colorClass="bg-yellow-100"/>
+                <StatCard title="Horas no Mês" value={stats.month} icon={<Clock size={24} className="text-pink-600"/>} colorClass="bg-pink-100"/>
+            </div>
+
+            <div className="bg-white p-6 rounded-lg shadow">
+                <h3 className="text-lg font-semibold text-gray-800 mb-4">Registros de Ponto</h3>
+                <div className="overflow-x-auto">
+                    <table className="w-full text-sm text-left text-gray-500">
+                        <thead className="text-xs text-gray-700 uppercase bg-gray-50">
+                            <tr>
+                                <th scope="col" className="px-6 py-3">Data</th>
+                                <th scope="col" className="px-6 py-3">Entrada</th>
+                                <th scope="col" className="px-6 py-3">Saída</th>
+                                <th scope="col" className="px-6 py-3">Duração</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {timeLogs.map(log => {
+                                const clockIn = DateTime.fromISO(log.clock_in).setZone(timeZone);
+                                const clockOut = log.clock_out ? DateTime.fromISO(log.clock_out).setZone(timeZone) : null;
+                                const duration = clockOut ? clockOut.diff(clockIn, ['hours', 'minutes']).toObject() : null;
+                                return (
+                                    <tr key={log.id} className="bg-white border-b hover:bg-gray-50">
+                                        <td className="px-6 py-4 font-medium text-gray-900">{clockIn.toFormat('dd/MM/yyyy')}</td>
+                                        <td className="px-6 py-4 text-green-600 font-semibold">{clockIn.toFormat('HH:mm')}</td>
+                                        <td className="px-6 py-4 text-red-600 font-semibold">{clockOut ? clockOut.toFormat('HH:mm') : '...'}</td>
+                                        <td className="px-6 py-4">{duration ? `${Math.floor(duration.hours)}h ${Math.floor(duration.minutes)}min` : '-'}</td>
+                                    </tr>
+                                )
+                            })}
+                        </tbody>
+                    </table>
+                </div>
+                {timeLogs.length === 0 && <p className="text-center text-gray-500 mt-6">Nenhum registro de ponto encontrado.</p>}
+            </div>
+        </div>
+    );
+};
+
 
 const CategoriasView = ({ expensesGrouped }) => {
     const [expandedCategory, setExpandedCategory] = useState(null);
@@ -1248,7 +1345,7 @@ const App = () => {
         {processedData && (
           <>
             {activeView === 'visaoGeral' && <VisaoGeralView stats={processedData} />}
-            {activeView === 'ponto' && <p>Em breve...</p>} {/* Placeholder para a nova tela */}
+            {activeView === 'ponto' && <PontoView timeLogs={timeLogs} />}
             {activeView === 'categorias' && <CategoriasView expensesGrouped={processedData.expensesGrouped} />}
             {activeView === 'tabela' && <TabelaTransacoesView transactions={allTransactions} setTransactions={setAllTransactions} phoneNumber={phoneNumber} categories={categories} setCategories={setCategories} />}
             {activeView === 'gerenciarCategorias' && <GerenciarCategoriasView categories={categories} setCategories={setCategories} phoneNumber={phoneNumber} />}
