@@ -191,10 +191,15 @@ const PontoView = ({ timeLogs, setTimeLogs, phoneNumber }) => {
     const [endDate, setEndDate] = useState(DateTime.now().setZone(timeZone).endOf('month').toISODate());
     const API_BASE_URL = 'https://meu-gestor-fernando.onrender.com';
 
+    // ==================================================================
+    // ||                      PONTO DA CORREÇÃO 1                     ||
+    // ==================================================================
+    // Função de formatação de duração melhorada para ser mais robusta.
     const formatDuration = (duration) => {
         if (!duration || !duration.isValid) return "0h 0min";
-        const hours = Math.floor(duration.as('hours'));
-        const minutes = Math.floor(duration.as('minutes') % 60);
+        const shifted = duration.shiftTo('hours', 'minutes').normalize();
+        const hours = Math.floor(shifted.hours);
+        const minutes = Math.floor(shifted.minutes);
         return `${hours}h ${minutes}min`;
     };
 
@@ -253,15 +258,21 @@ const PontoView = ({ timeLogs, setTimeLogs, phoneNumber }) => {
 
         const expectedDuration = Duration.fromObject({ hours: expectedWorkDays * 8 });
         const balanceDuration = workedDuration.minus(expectedDuration);
-
-        const balanceSign = balanceDuration.as('milliseconds') < 0 ? '-' : '+';
-        const formattedBalance = formatDuration(balanceDuration.abs());
+        
+        // ==================================================================
+        // ||                      PONTO DA CORREÇÃO 2                     ||
+        // ==================================================================
+        // Lógica mais segura para calcular o saldo, evitando o método .abs()
+        const balanceMillis = balanceDuration.as('milliseconds');
+        const balanceSign = balanceMillis < 0 ? '-' : '+';
+        const absBalanceDuration = Duration.fromMillis(Math.abs(balanceMillis));
+        const formattedBalance = formatDuration(absBalanceDuration);
 
         return {
             worked: formatDuration(workedDuration.normalize()),
             expected: formatDuration(expectedDuration.normalize()),
             balance: `${balanceSign}${formattedBalance}`,
-            balanceColor: balanceDuration.as('milliseconds') >= 0 ? 'text-green-600' : 'text-red-600'
+            balanceColor: balanceMillis >= 0 ? 'text-green-600' : 'text-red-600'
         }
     }, [timeLogs, startDate, endDate]);
 
