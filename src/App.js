@@ -191,10 +191,6 @@ const PontoView = ({ timeLogs, setTimeLogs, phoneNumber }) => {
     const [endDate, setEndDate] = useState(DateTime.now().setZone(timeZone).endOf('month').toISODate());
     const API_BASE_URL = 'https://meu-gestor-fernando.onrender.com';
 
-    // ==================================================================
-    // ||                      PONTO DA CORREÇÃO 1                     ||
-    // ==================================================================
-    // Função de formatação de duração melhorada para ser mais robusta.
     const formatDuration = (duration) => {
         if (!duration || !duration.isValid) return "0h 0min";
         const shifted = duration.shiftTo('hours', 'minutes').normalize();
@@ -259,10 +255,6 @@ const PontoView = ({ timeLogs, setTimeLogs, phoneNumber }) => {
         const expectedDuration = Duration.fromObject({ hours: expectedWorkDays * 8 });
         const balanceDuration = workedDuration.minus(expectedDuration);
         
-        // ==================================================================
-        // ||                      PONTO DA CORREÇÃO 2                     ||
-        // ==================================================================
-        // Lógica mais segura para calcular o saldo, evitando o método .abs()
         const balanceMillis = balanceDuration.as('milliseconds');
         const balanceSign = balanceMillis < 0 ? '-' : '+';
         const absBalanceDuration = Duration.fromMillis(Math.abs(balanceMillis));
@@ -555,6 +547,19 @@ const TabelaTransacoesView = ({ transactions, setTransactions, phoneNumber, cate
       });
   }, [transactions, filterCategory, filterText, startDate, endDate]);
 
+  // ==================================================================
+  // ||                      PONTO DA CORREÇÃO                       ||
+  // ==================================================================
+  // Calcula o total dos itens filtrados na tabela.
+  const totalFiltered = useMemo(() => {
+    return filteredTransactions.reduce((sum, t) => {
+        // Assume que 'expense' tem valor negativo e 'income' positivo
+        // Se o valor já vem negativo do backend, a lógica é mais simples: sum + t.value
+        return sum + t.value;
+    }, 0);
+  }, [filteredTransactions]);
+
+
   const handleEdit = (transaction) => {
       setModalError(null);
       setSelectedTransaction(transaction);
@@ -671,6 +676,16 @@ const TabelaTransacoesView = ({ transactions, setTransactions, phoneNumber, cate
                   {categories.map(cat => <option key={cat.id} value={cat.name}>{cat.name}</option>)}
               </select>
               <input type="text" value={filterText} onChange={e => setFilterText(e.target.value)} placeholder="Pesquisar descrição..." className="p-2 border rounded-md" />
+          </div>
+
+          {/* NOVO CARD DE TOTAL */}
+          <div className="mb-6">
+            <StatCard 
+                title="Total do Período Selecionado" 
+                value={`R$ ${totalFiltered.toFixed(2).replace('.', ',')}`} 
+                icon={<DollarSign size={24} className="text-blue-600"/>} 
+                colorClass="bg-blue-100"
+            />
           </div>
 
           <div className="overflow-x-auto">
